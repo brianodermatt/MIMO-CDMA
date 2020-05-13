@@ -27,6 +27,15 @@ function BER = simulator(P)
     
     NumberOfBits   = P.NumberOfSymbols*P.Modulation*RX; % per Frame
     
+    encoder = comm.ConvolutionalEncoder(...
+        'TerminationMethod', 'Continuous',...
+        'TrellisStructure', poly2trellis(9, [753 561])...
+    );
+    decoder = comm.ViterbiDecoder(...
+        'TerminationMethod', 'Continuous',...
+        'TracebackDepth', 5*9,...
+        'TrellisStructure', poly2trellis(9, [753 561])...
+    );
     
     % Channel
     switch P.ChannelType
@@ -39,9 +48,26 @@ function BER = simulator(P)
 Results = zeros(1,length(P.SNRRange));
 
 for ii = 1:P.NumberOfFrames
-    
     ii
-
+    
+    %% Encoder
+    % Generate random information bits for the user
+    informationBits = randi([0, 1], RX, NumberOfBits/RX);
+    
+    % Convolutional Encoding
+    for i = 1:RX
+        encodedBits(:,i) = encoder(informationBits(i,:).');
+    end
+    encodedBits = encodedBits.';
+    
+    % Orthogonal Modulation
+    WalshMatrix = (-hadamard(64) + 1)/2;
+    WalshFunctions = WalshMatrix(1:RX,:);
+    modulatedBits = WalshFunctions.'*encodedBits;
+    
+    % PN spreading (quadrature spread length 2^15)
+    
+    %% Old code
     bits = randi([0 1],1,NumberOfBits); % Random Data
  
     % Modulation
@@ -55,7 +81,9 @@ for ii = 1:P.NumberOfFrames
 
     % distribute symbols on users
     SymUsers = reshape(symbols,RX,NumberOfBits/RX);
-        
+    
+    % Convolution Enconding
+    
     % multiply hadamard
     txsymbols = SpreadSequence(:,1:RX) * SymUsers;
         
