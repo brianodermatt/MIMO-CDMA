@@ -12,11 +12,9 @@ function BER = simulator(P)
        return;
     end
     
-    %--- old ---%
+    
     RX = P.CDMAUsers;
     SeqLen = P.HamLen;
-    %-----------%
-    
     NumberOfInformationBits = P.NumberOfSymbols;                    % per user
     NumberOfEncodedBits = P.Modulation * NumberOfInformationBits;   % per user
     NumberOfModulatedBits = NumberOfEncodedBits * P.HamLen;
@@ -67,7 +65,7 @@ function BER = simulator(P)
         informationBits = randi([0, 1], RX, P.NumberOfSymbols);
 
         % Convolutional Encoding
-        clear encodedBits;
+        encodedBits = zeros(NumberOfEncodedBits, RX);
         for i = 1:RX
             encodedBits(:,i) = encoder(informationBits(i,:).');
         end
