@@ -1,176 +1,127 @@
-% Wireless Receivers II - Assignment 2:
-%
-% Direct Sequence Spread Spectrum Simulation Framework
-%
-% Telecommunications Circuits Laboratory
-% EPFL
+% EPFL Advanced Wireless Receivers
+% Project IS95, Spring 2020
+% Francesco Gallo, Brian Odermatt
 
 
 function BER = simulator(P)
 
+    %% Setup parameters
     if P.CDMAUsers > P.HamLen
        disp('WARNING: More user then sequences');
        BER = -1;
        return;
     end
+    
+    %--- old ---%
     RX = P.CDMAUsers;
+    SeqLen = P.HamLen;
+    %-----------%
     
-    % Generate the spreading sequences
-    HadamardMatrix = hadamard(P.HamLen)/sqrt(P.HamLen);            
-    SpreadSequence = HadamardMatrix;
+    NumberOfInformationBits = P.NumberOfSymbols;                    % per user
+    NumberOfEncodedBits = P.Modulation * NumberOfInformationBits;   % per user
+    NumberOfModulatedBits = NumberOfEncodedBits * P.HamLen;
+    switch P.ChannelType
+        case 'Multipath', NumberOfChipsRX = NumberOfModulatedBits + P.ChannelLength - 1;
+        otherwise, NumberOfChipsRX = NumberOfModulatedBits;
+    end
     
-    SeqLen         = P.HamLen;
-    
-    NumberOfChips  = P.NumberOfSymbols*P.Modulation*SeqLen; % per Frame
-
-    PNSequence     = genbarker(NumberOfChips); % -(2*step(GS)-1);
-    
-    NumberOfBits   = P.NumberOfSymbols*P.Modulation*RX; % per Frame
-    
+    % Convolutional encoder
     encoder = comm.ConvolutionalEncoder(...
         'TerminationMethod', 'Continuous',...
         'TrellisStructure', poly2trellis(9, [753 561])...
     );
+    
+    % Orthogonal modulation
+    WalshMatrix = (-hadamard(64) + 1)/2;
+    WalshFunctions = WalshMatrix(1:RX,:);
+    
+    % PN spreading polynomials
+    % in-phase (I)
+    iPwrs = [15, 13, 9, 8, 7, 5, 0]';
+    iGen = zeros(16, 1);
+    iGen(16-iPwrs) = ones(size(iPwrs));     % Gi = [ 1 0 1 0 0 0 1 1 1 0 1 0 0 0 0 1]';
+    iState = [zeros(length(iGen)-1, 1); 1]; % Initial State
+    
+    % quadrature-phase (Q)
+    qPwrs = [15, 12, 11, 10, 6, 5, 4, 3, 0]';
+    qGen = zeros(16, 1);
+    qGen(16-qPwrs) = ones(size(qPwrs));     % Gq = [ 1 0 0 1 1 1 0 0 0 1 1 1 1 0 0 1]';
+    qState = [zeros(length(qGen)-1, 1); 1]; % Initial State
+
+    
+    % Convolutional decoder
     decoder = comm.ViterbiDecoder(...
         'TerminationMethod', 'Continuous',...
         'TracebackDepth', 5*9,...
         'TrellisStructure', poly2trellis(9, [753 561])...
     );
-    
-    % Channel
-    switch P.ChannelType
-        case 'Multipath',
-            NumberOfChipsRX   = NumberOfChips+P.ChannelLength-1;
-        otherwise,
-            NumberOfChipsRX = NumberOfChips;
-    end
 
-Results = zeros(1,length(P.SNRRange));
-
-for ii = 1:P.NumberOfFrames
-    ii
     
-    %% Encoder
-    % Generate random information bits for the user
-    informationBits = randi([0, 1], RX, NumberOfBits/RX);
-    
-    % Convolutional Encoding
-    for i = 1:RX
-        encodedBits(:,i) = encoder(informationBits(i,:).');
-    end
-    encodedBits = encodedBits.';
-    
-    % Orthogonal Modulation
-    WalshMatrix = (-hadamard(64) + 1)/2;
-    WalshFunctions = WalshMatrix(1:RX,:);
-    modulatedBits = WalshFunctions.'*encodedBits;
-    
-    % PN spreading (quadrature spread length 2^15)
-    
-    %% Old code
-    bits = randi([0 1],1,NumberOfBits); % Random Data
- 
-    % Modulation
-    switch P.Modulation % Modulate Symbols
-        case 1, % BPSK
-            symbols = -(2*bits - 1);
-        otherwise,
-            disp('Modulation not supported')
-    end
     
 
-    % distribute symbols on users
-    SymUsers = reshape(symbols,RX,NumberOfBits/RX);
-    
-    % Convolution Enconding
-    
-    % multiply hadamard
-    txsymbols = SpreadSequence(:,1:RX) * SymUsers;
+    for ii = 1:P.NumberOfFrames
+        ii
+
+        %% Transmitter
+        % Generate random information bits for the user
+        informationBits = randi([0, 1], RX, P.NumberOfSymbols);
+
+        % Convolutional Encoding
+        clear encodedBits;
+        for i = 1:RX
+            encodedBits(:,i) = encoder(informationBits(i,:).');
+        end
+        encodedBits = encodedBits.';
+
+        % Orthogonal Modulation
+        modulatedBits = reshape(WalshFunctions.'*encodedBits, NumberOfModulatedBits, 1);
+
+        % PN spreading (quadrature spread length 2^15)
+        [iPN, iState] = lsfrPN(iGen, iState, NumberOfModulatedBits);
+        [qPN, qState] = lsfrPN(qGen, qState, NumberOfModulatedBits);
+
+        % modulation
+        switch P.Modulation
+            case 2  % QPSK
+                pnModulated = sign(iPN-1/2) + 1i*sign(qPN-1/2);
+            otherwise, disp('Modulation not supported')
+        end
         
-    % apply Barker code
-    waveform = txsymbols(:).*PNSequence;
+        wave = modulatedBits(:) .* pnModulated;
 
-    % reshape to add multi RX antenna suppport
-    waveform  = reshape(waveform,1,NumberOfChips);
-    mwaveform = repmat(waveform,[1 1 RX]);
-    
-    % Channel
-    switch P.ChannelType
-        case 'AWGN',
-            himp = ones(RX,1);
-        case 'Multipath',
-            himp = sqrt(1/2)* ( randn(RX,P.ChannelLength) + 1i * randn(RX,P.ChannelLength) );
-%             himp = (ones(RX,1) * sqrt(P.PDP)) .* himp;
-        otherwise,
-            disp('Channel not supported')
-    end
-    
-    %%%
-    % Simulation
-    snoise = ( randn(1,NumberOfChipsRX,RX) + 1i* randn(1,NumberOfChipsRX,RX) );
-    
-    % SNR Range
-    for ss = 1:length(P.SNRRange)
-        SNRdb  = P.SNRRange(ss);
-        SNRlin = 10^(SNRdb/10);
-        noise  = 1/sqrt(2*SeqLen*SNRlin) *snoise;
-        
-        % Channel
+        % reshape to add multi RX antenna support (from 1 col-vector to
+        % multiple copies of a row vector)
+        wave = reshape(wave, 1, NumberOfModulatedBits);
+        mwave = repmat(wave, [1 1 RX]);
+
+
+        %% Channel
         switch P.ChannelType
-            case 'AWGN',
-                y = mwaveform + noise;
-            case 'Multipath'     
-                y = zeros(1,NumberOfChips+P.ChannelLength-1,RX);
-                for i = 1:RX
-                    y(1,:,i) = conv(mwaveform(1,:,i),himp(i,:)) + noise(1,:,i); 
-                end
-            otherwise,
-                disp('Channel not supported')
+            case 'AWGN', himp = ones(RX,1);
+            case 'Multipath', himp = sqrt(1/2)*(randn(RX,P.ChannelLength) + 1i*randn(RX,P.ChannelLength));
+            otherwise, disp('Channel not supported')
         end
-        
- 
-        % Receiver
-        switch P.ReceiverType
-            case 'Rake',
-                rxbitsuser = zeros(RX,NumberOfBits/RX);
-                
-                for rr=1:RX
-                    UserSequence = SpreadSequence(:,rr);
-                    
-                    
-                    FrameLength = P.NumberOfSymbols * SeqLen;
-                    
-                    fingers = zeros(P.ChannelLength,P.NumberOfSymbols);
-                
-                    for i=1:P.ChannelLength
-                        data    =  y(1,i:i+FrameLength-1,rr).*PNSequence.'; 
-                        rxvecs  = reshape(data,SeqLen,P.NumberOfSymbols);
-                        fingers(i,:) = 1/SeqLen * UserSequence.' * rxvecs;
+        % random complex normal noise ~N(0,1)
+        snoise = randn(1,NumberOfChipsRX,RX) + 1i*randn(1,NumberOfChipsRX,RX);
+
+        % SNR Range
+        for ss = 1:length(P.SNRRange)
+            SNRdb  = P.SNRRange(ss);
+            SNRlin = 10^(SNRdb/10);
+            noise  = 1/sqrt(2*SeqLen*SNRlin)*snoise;
+
+            % Channel: add noise and multipath
+            switch P.ChannelType
+                case 'Bypass', y = mwave;
+                case 'AWGN', y = mwave + noise;
+                case 'Multipath'     
+                    y = zeros(1, NumberOfChipsRX, RX);
+                    for i = 1:RX
+                        y(1,:,i) = conv(mwave(1,:,i),himp(i,:)) + noise(1,:,i); 
                     end
-                    mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
-                    rxbitsuser(rr,:) = real(mrc) < 0;
-                end
-                rxbits = reshape(rxbitsuser,1,NumberOfBits);
-            otherwise,
-                disp('Source Encoding not supported')
-        end
-        
-        % BER count
-        errors =  sum(rxbits ~= bits);
-        
-        Results(ss) = Results(ss) + errors;
-        
+                otherwise, disp('Channel not supported')
+            end     
+         end
     end
-end
 
-BER = Results/(NumberOfBits*P.NumberOfFrames);
-end
-
-function seq = genbarker(len)
-    BarkerSeq = [+1 +1 +1 +1 +1 -1 -1 +1 +1 -1 +1 -1 +1];
-
-    factor = ceil(len/length(BarkerSeq));
-    b = repmat(BarkerSeq,1,factor);
-    b = BarkerSeq.'*ones(1,factor);
-    seq = b(1:len).';
 end

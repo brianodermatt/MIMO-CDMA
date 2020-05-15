@@ -1,9 +1,8 @@
-% Wireless Receivers II - Assignment 2:
-%
-% AWGN CDMA Parameter File
-%
-% Telecommunications Circuits Laboratory
-% EPFL
+% EPFL Advanced Wireless Receivers
+% Project IS95, Spring 2020
+% Francesco Gallo, Brian Odermatt
+
+clc; clear all; close all;
 
 % Parameters
 P.NumberOfFrames      = 100;
@@ -12,9 +11,9 @@ P.NumberOfSymbols     = 1000;
 P.AccessType = 'CDMA';
 P.CDMAUsers     = 2;
 
-P.Modulation    = 1;        % 1: BPSK
+P.Modulation    = 2;        % 2: QPSK
 
-P.ChannelType   = 'Multipath'; % 'AWGN', 'Fading'
+P.ChannelType   = 'Multipath'; % 'AWGN'
 P.ChannelLength = 3;
 
 P.HamLen = 64; % Length of Hadamard Sequence, given in IS95 standard
