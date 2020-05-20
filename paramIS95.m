@@ -8,13 +8,13 @@ clc; clear all; close all;
 P.NumberOfFrames	= 100;      % Total number of sent frames
 P.BitsPerUser       = 500;      % Bits per frame that each user is given
 P.Modulation        = 1;        % Only BPSK supported!
-P.CDMAUsers         = 2;        % Total number of users
+P.CDMAUsers         = 3;        % Total number of users
 P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2 supported!
 P.HamLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
 P.ReceiverType      = 'Rake';	% Only 'Rake' supported!
 
 % Parameters for AWGN or Bypass channels
-P.ChannelType       = 'AWGN';	% Set 'Bypass' for no channel effect
+P.ChannelType       = 'Bypass';	% Set 'Bypass' for no channel effect
 P.ChannelLength     = 1;        % It must be one, otherwise error
 
 % % Parameters for Multipath channel

@@ -13,18 +13,19 @@ function BER = simulator(P)
     end
     
     % Initial values and constants
-    
+    ConstraintLength = 9;
     Users = P.CDMAUsers;
     
     HadamardMatrix = hadamard(P.HamLen)/sqrt(P.HamLen);
     SpreadSequence = HadamardMatrix;
     SeqLen         = P.HamLen;
     
-    NumberOfBits   = P.BitsPerUser * P.Modulation * Users; % per Frame
+    NumberOfBits   = (P.BitsPerUser * P.Modulation)* Users; % per Frame
+
+    NumberOfEncodedBitsPerUser = (NumberOfBits/Users + ConstraintLength-1)/P.ConvRate;
+    NumberOfEncodedBits = (NumberOfBits + (ConstraintLength-1)*Users)/P.ConvRate ; % per Frame
     
-    NumberOfEncodedBits = NumberOfBits/P.ConvRate; % per Frame
-    
-    NumberOfChips  = P.BitsPerUser/P.ConvRate * P.Modulation * SeqLen; % per user, per Frame
+    NumberOfChips  = NumberOfEncodedBits * SeqLen / Users; % per user, per Frame
     
     % PN spreading polynomials
     % in-phase (I)
@@ -45,16 +46,16 @@ function BER = simulator(P)
     PNSequence = - sign(iPN-1/2) - 1i*sign(qPN-1/2);
 
     % Convolutional encoder
+    ConvolutionalGeneratorPolynoms = [753 561];
     encoder = comm.ConvolutionalEncoder(...
-        'TerminationMethod', 'Continuous',...
-        'TrellisStructure', poly2trellis(9, [753 561])...
+        'TerminationMethod', 'Terminated',...
+        'TrellisStructure', poly2trellis(ConstraintLength, ConvolutionalGeneratorPolynoms)...
     );
     
     % Convolutional decoder
     decoder = comm.ViterbiDecoder(...
-        'TerminationMethod', 'Continuous',...
-        'TracebackDepth', 200,...
-        'TrellisStructure', poly2trellis(9, [753 561])...
+        'TerminationMethod', 'Terminated',...
+        'TrellisStructure', poly2trellis(ConstraintLength, ConvolutionalGeneratorPolynoms)...
     );
     
 
@@ -148,18 +149,19 @@ for ii = 1:P.NumberOfFrames
                 for rr=1:Users
                     UserSequence = SpreadSequence(:,rr);
                     
-                    FrameLength = P.BitsPerUser/P.ConvRate * SeqLen;
+                    FrameLength = NumberOfChipsRX;
                     
-                    fingers = zeros(P.ChannelLength,P.BitsPerUser/P.ConvRate);
+                    fingers = zeros(P.ChannelLength,NumberOfEncodedBitsPerUser);
                 
                     for i=1:P.ChannelLength
                         data    =  y(1,i:i+FrameLength-1,rr)./PNSequence.'; 
-                        rxvecs  = reshape(data,SeqLen,P.BitsPerUser/P.ConvRate);
+                        rxvecs  = reshape(data,SeqLen,NumberOfEncodedBitsPerUser);
                         fingers(i,:) = 1/SeqLen * UserSequence.' * rxvecs;
                     end
                     mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
                     % Symbols for soft decoder
-                    RxBits(rr,:) = step(decoder, sign(real(mrc)).');
+                    decodedBitsForUser = step(decoder, sign(real(mrc)).');
+                    RxBits(rr,:) = decodedBitsForUser(1:P.BitsPerUser);
                 end
                 
             otherwise
