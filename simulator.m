@@ -71,114 +71,114 @@ function BER = simulator(P)
     Results = zeros(1,length(P.SNRRange));
 
 
-for ii = 1:P.NumberOfFrames
-    
-    ii
+    for ii = 1:P.NumberOfFrames
 
-    Bits = randi([0 1], NumberOfBits/Users, Users); % Random Data
- 
-    % Convolutional encoding: rate 1/2
-    EncBits = zeros(NumberOfEncodedBits/Users, Users);
-    for i = 1:Users
-        EncBits(:,i) = step(encoder, Bits(:,i));
-    end
-    EncBits = EncBits.';
-        
-    % Modulation
-    switch P.Modulation % Modulate Symbols
-        case 1 % BPSK
-            symbols = -(2*EncBits - 1);
-        otherwise
-            error('Modulation not supported')
-    end
-        
-    % Orthogonal spreading
-    txsymbols = SpreadSequence(:,1:Users) * symbols;
-        
-    % apply PN sequence
-    waveform = txsymbols(:).*PNSequence;
+        ii
 
-    % reshape to add multi RX antenna suppport
-    waveform  = reshape(waveform,1,NumberOfChips);
-    mwaveform = repmat(waveform,[1 1 Users]);
-    
-    % Channel
-    switch P.ChannelType
-        case 'Bypass'
-            himp = ones(Users,1);
-        case 'AWGN'
-            himp = ones(Users,1);
-        case 'Multipath'
-            himp = sqrt(1/2)* ( randn(Users,P.ChannelLength) + 1i * randn(Users,P.ChannelLength) );
-        otherwise
-            error('Channel not supported')
-    end
-    
-    %%%
-    % Simulation
-    snoise = randn(1,NumberOfChipsRX,Users) + 1i* randn(1,NumberOfChipsRX,Users);
-    
-    % SNR Range
-    for ss = 1:length(P.SNRRange)
-        SNRdb  = P.SNRRange(ss);
-        SNRlin = 10^(SNRdb/10);
-        noise  = 1/sqrt(2*SeqLen*SNRlin) *snoise;
-        
+        Bits = randi([0 1], NumberOfBits/Users, Users); % Random Data
+
+        % Convolutional encoding: rate 1/2
+        EncBits = zeros(NumberOfEncodedBits/Users, Users);
+        for i = 1:Users
+            EncBits(:,i) = step(encoder, Bits(:,i));
+        end
+        EncBits = EncBits.';
+
+        % Modulation
+        switch P.Modulation % Modulate Symbols
+            case 1 % BPSK
+                symbols = -(2*EncBits - 1);
+            otherwise
+                error('Modulation not supported')
+        end
+
+        % Orthogonal spreading
+        txsymbols = SpreadSequence(:,1:Users) * symbols;
+
+        % apply PN sequence
+        waveform = txsymbols(:).*PNSequence;
+
+        % reshape to add multi RX antenna suppport
+        waveform  = reshape(waveform,1,NumberOfChips);
+        mwaveform = repmat(waveform,[1 1 Users]);
+
         % Channel
         switch P.ChannelType
             case 'Bypass'
-                y = mwaveform;
+                himp = ones(Users,1);
             case 'AWGN'
-                y = mwaveform + noise;
-            case 'Multipath'     
-                y = zeros(1,NumberOfChips+P.ChannelLength-1,Users);
-                for i = 1:Users
-                    y(1,:,i) = conv(mwaveform(1,:,i),himp(i,:)) + noise(1,:,i); 
-                end
+                himp = ones(Users,1);
+            case 'Multipath'
+                himp = sqrt(1/2)* ( randn(Users,P.ChannelLength) + 1i * randn(Users,P.ChannelLength) );
             otherwise
                 error('Channel not supported')
         end
-        
- 
-        % Receiver
-        switch P.ReceiverType
-            case 'Rake'
-                
-                RxBits = zeros(Users,NumberOfBits/Users);
-                
-                for rr=1:Users
-                    UserSequence = SpreadSequence(:,rr);
-                    
-                    FrameLength = NumberOfChipsRX;
-                    
-                    fingers = zeros(P.ChannelLength,NumberOfEncodedBitsPerUser);
-                
-                    for i=1:P.ChannelLength
-                        data    =  y(1,i:i+FrameLength-1,rr)./PNSequence.'; 
-                        rxvecs  = reshape(data,SeqLen,NumberOfEncodedBitsPerUser);
-                        fingers(i,:) = 1/SeqLen * UserSequence.' * rxvecs;
+
+        %%%
+        % Simulation
+        snoise = randn(1,NumberOfChipsRX,Users) + 1i* randn(1,NumberOfChipsRX,Users);
+
+        % SNR Range
+        for ss = 1:length(P.SNRRange)
+            SNRdb  = P.SNRRange(ss);
+            SNRlin = 10^(SNRdb/10);
+            noise  = 1/sqrt(2*SeqLen*SNRlin) *snoise;
+
+            % Channel
+            switch P.ChannelType
+                case 'Bypass'
+                    y = mwaveform;
+                case 'AWGN'
+                    y = mwaveform + noise;
+                case 'Multipath'     
+                    y = zeros(1,NumberOfChips+P.ChannelLength-1,Users);
+                    for i = 1:Users
+                        y(1,:,i) = conv(mwaveform(1,:,i),himp(i,:)) + noise(1,:,i); 
                     end
-                    mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
-                    % Symbols for soft decoder
-                    decodedBitsForUser = step(decoder, sign(real(mrc)).');
-                    RxBits(rr,:) = decodedBitsForUser(1:P.BitsPerUser);
-                end
-                
-            otherwise
-                error('Receiver not supported')
+                otherwise
+                    error('Channel not supported')
+            end
+
+
+            % Receiver
+            switch P.ReceiverType
+                case 'Rake'
+
+                    RxBits = zeros(Users,NumberOfBits/Users);
+
+                    for rr=1:Users
+                        UserSequence = SpreadSequence(:,rr);
+
+                        FrameLength = NumberOfChipsRX;
+
+                        fingers = zeros(P.ChannelLength,NumberOfEncodedBitsPerUser);
+
+                        for i=1:P.ChannelLength
+                            data    =  y(1,i:i+FrameLength-1,rr)./PNSequence.'; 
+                            rxvecs  = reshape(data,SeqLen,NumberOfEncodedBitsPerUser);
+                            fingers(i,:) = 1/SeqLen * UserSequence.' * rxvecs;
+                        end
+                        mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
+                        % Symbols for soft decoder
+                        decodedBitsForUser = step(decoder, real(mrc).');
+                        RxBits(rr,:) = decodedBitsForUser(1:P.BitsPerUser);
+                    end
+
+                otherwise
+                    error('Receiver not supported')
+            end
+
+            Bits = reshape(Bits, NumberOfBits, 1);
+            RxBits = reshape(RxBits.', NumberOfBits, 1);
+
+
+            % BER count
+            errors =  sum(RxBits ~= Bits);
+
+            Results(ss) = Results(ss) + errors;
+
         end
-        
-        Bits = reshape(Bits, NumberOfBits, 1);
-        RxBits = reshape(RxBits.', NumberOfBits, 1);
-        
-        
-        % BER count
-        errors =  sum(RxBits ~= Bits);
-        
-        Results(ss) = Results(ss) + errors;
-        
     end
-end
 
     BER = Results/(NumberOfBits*P.NumberOfFrames);
 end
