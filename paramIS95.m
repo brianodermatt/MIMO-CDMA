@@ -5,24 +5,26 @@
 clc; clear all; close all;
 
 % Parameters
-P.NumberOfFrames      = 100;
-P.NumberOfSymbols     = 1000;
+P.NumberOfFrames	= 100;      % Total number of sent frames
+P.BitsPerUser       = 500;      % Bits per frame that each user is given
+P.Modulation        = 1;        % Only BPSK supported!
+P.CDMAUsers         = 2;        % Total number of users
+P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2 supported!
+P.HamLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
+P.ReceiverType      = 'Rake';	% Only 'Rake' supported!
 
-P.AccessType = 'CDMA';
-P.CDMAUsers     = 2;
+% Parameters for AWGN or Bypass channels
+P.ChannelType       = 'AWGN';	% Set 'Bypass' for no channel effect
+P.ChannelLength     = 1;        % It must be one, otherwise error
 
-P.Modulation    = 2;        % 2: QPSK
-
-P.ChannelType   = 'Multipath'; % 'AWGN'
-P.ChannelLength = 3;
-
-P.HamLen = 64; % Length of Hadamard Sequence, given in IS95 standard
+% % Parameters for Multipath channel
+% P.ChannelType       = 'Multipath';
+% P.ChannelLength     = 3;
 
 P.SNRRange = -10:20; % SNR Range to simulate in dB
 
-P.ReceiverType  = 'Rake';
-
 BER = simulator(P);
+% BER = simulator_NoDec(P);
 
 simlab = sprintf('%s - Length: %d - Users: %d' ,P.ChannelType,P.ChannelLength,P.CDMAUsers);
 

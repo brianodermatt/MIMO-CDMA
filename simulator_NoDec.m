@@ -50,13 +50,13 @@ function BER = simulator(P)
         'TrellisStructure', poly2trellis(9, [753 561])...
     );
     
-    % Convolutional decoder
-    decoder = comm.ViterbiDecoder(...
-        'TerminationMethod', 'Continuous',...
-        'TracebackDepth', 200,...
-        'TrellisStructure', poly2trellis(9, [753 561])...
-    );
-    
+%     % Convolutional decoder
+%     decoder = comm.ViterbiDecoder(...
+%         'TerminationMethod', 'Continuous',...
+%         'TracebackDepth', 5*9,...
+%         'TrellisStructure', poly2trellis(9, [753 561])...
+%     );
+%     
 
     % Channel
     switch P.ChannelType
@@ -143,7 +143,9 @@ for ii = 1:P.NumberOfFrames
         switch P.ReceiverType
             case 'Rake'
                 
-                RxBits = zeros(Users,NumberOfBits/Users);
+                %RxBits = zeros(Users,NumberOfBits/Users);
+                
+                RxEncBits = zeros(Users,NumberOfEncodedBits/Users);
                 
                 for rr=1:Users
                     UserSequence = SpreadSequence(:,rr);
@@ -159,24 +161,32 @@ for ii = 1:P.NumberOfFrames
                     end
                     mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
                     % Symbols for soft decoder
-                    RxBits(rr,:) = step(decoder, sign(real(mrc)).');
+                    %RxBits(rr,:) = step(decoder, real(mrc).');
+                    RxEncBits(rr,:) = real(mrc) < 0;
                 end
                 
             otherwise
                 error('Receiver not supported')
         end
         
-        Bits = reshape(Bits, NumberOfBits, 1);
-        RxBits = reshape(RxBits.', NumberOfBits, 1);
+%         RxBits = reshape(RxBits,1,NumberOfBits);
+%         Bits = reshape(Bits,1,NumberOfBits);
+%         
+%         % BER count
+%         errors =  sum(RxBits ~= Bits);
         
+        RxEncBits = reshape(RxEncBits,1,NumberOfEncodedBits);
+        EncBits = reshape(EncBits,1,NumberOfEncodedBits);
         
         % BER count
-        errors =  sum(RxBits ~= Bits);
+        errors =  sum(RxEncBits ~= EncBits);
         
         Results(ss) = Results(ss) + errors;
         
     end
 end
 
-    BER = Results/(NumberOfBits*P.NumberOfFrames);
+%     BER = Results/(NumberOfBits*P.NumberOfFrames);
+
+BER = Results/(NumberOfBits/P.ConvRate*P.NumberOfFrames);
 end
