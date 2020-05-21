@@ -1,25 +1,28 @@
-% EPFL Advanced Wireless Receivers
-% Project IS95, Spring 2020
-% Francesco Gallo, Brian Odermatt
+% EPFL - Advanced Wireless Receivers
+% Final Project:
+% CDMA IS95 standard, parameter file
+% Brian Odermatt, Francesco Gallo
+% May 2020
 
 clc; clear all; close all;
 
 % Parameters
 P.NumberOfFrames	= 250;      % Total number of sent frames
 P.BitsPerUser       = 172;      % Bits per frame that each user is given, for 9600bps frame according to spec 
-P.Modulation        = 1;        % Only BPSK supported!
+P.Modulation        = 1;        % Only BPSK (1)
 P.CDMAUsers         = 3;        % Total number of users
-P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2 supported!
-P.HamLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
-P.ReceiverType      = 'Rake';	% Only 'Rake' supported!
+P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
+P.ConstrLen         = 9;        % Constraint length of convolutional encoder
+P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
+P.ReceiverType      = 'Rake';	% Only 'Rake'
 
-% Parameters for AWGN or Bypass channels
-P.ChannelType       = 'AWGN';	% Set 'Bypass' for no channel effect
-P.ChannelLength     = 1;        % It must be one, otherwise error
+% % Parameters for AWGN or Bypass channels
+% P.ChannelType       = 'AWGN';	% Set 'Bypass' for no channel effect
+% P.ChannelLength     = 1;        % It must be one, otherwise error
 
-% % Parameters for Multipath channel
-% P.ChannelType       = 'Multipath';
-% P.ChannelLength     = 3;
+% Parameters for Multipath channel
+P.ChannelType       = 'Multipath';
+P.ChannelLength     = 3;
 
 P.SNRRange = -28:-18; % SNR Range to simulate in dB
 

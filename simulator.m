@@ -1,49 +1,30 @@
-% Advanced Wireless Receivers - Final Project:
-%
-% CDMA IS 95 standard simulation
-%
+% EPFL - Advanced Wireless Receivers
+% Final Project:
+% CDMA IS95 standard, system simulator
 % Brian Odermatt, Francesco Gallo
-%
 % May 2020
 
 function BER = simulator(P)
 
-    if P.CDMAUsers > P.HamLen
+    if P.CDMAUsers > P.HadLen
        error('More users than available sequences')
     end
     
     % Initial values and constants
-    ConstraintLength = 9;
+    ConstraintLength = P.ConstrLen;
     Users = P.CDMAUsers;
     
-    HadamardMatrix = hadamard(P.HamLen)/sqrt(P.HamLen);
+    HadamardMatrix = hadamard(P.HadLen)/sqrt(P.HadLen);
     SpreadSequence = HadamardMatrix;
-    SeqLen         = P.HamLen;
+    SeqLen         = P.HadLen;
     
-    NumberOfBits   = (P.BitsPerUser * P.Modulation)* Users; % per Frame
-
-    NumberOfEncodedBitsPerUser = (NumberOfBits/Users + ConstraintLength-1)/P.ConvRate;
-    NumberOfEncodedBits = (NumberOfBits + (ConstraintLength-1)*Users)/P.ConvRate ; % per Frame
+    NumberOfBits            = (P.BitsPerUser * P.Modulation)* Users;                    % per Frame
+    NumberOfEncBits         = (NumberOfBits + (ConstraintLength-1)*Users)/P.ConvRate ;  % per Frame    
+    NumberOfEncBitsPerUser  = (NumberOfBits/Users + ConstraintLength-1)/P.ConvRate;     % per user, per Frame
+    NumberOfChipsPerUser    = NumberOfEncBits * SeqLen / Users;                         % per user, per Frame
     
-    NumberOfChips  = NumberOfEncodedBits * SeqLen / Users; % per user, per Frame
-    
-    % PN spreading polynomials
-    % in-phase (I)
-    iPwrs = [15; 13; 9; 8; 7; 5; 0];
-    iGen = zeros(16, 1);
-    iGen(16-iPwrs) = ones(size(iPwrs));     % Gi = [ 1 0 1 0 0 0 1 1 1 0 1 0 0 0 0 1]';
-    iState = [zeros(length(iGen)-1, 1); 1]; % Initial State
-    % quadrature-phase (Q)
-    qPwrs = [15; 12; 11; 10; 6; 5; 4; 3; 0];
-    qGen = zeros(16, 1);
-    qGen(16-qPwrs) = ones(size(qPwrs));     % Gq = [ 1 0 0 1 1 1 0 0 0 1 1 1 1 0 0 1]';
-    qState = [zeros(length(qGen)-1, 1); 1]; % Initial State
-    % PN spreading (quadrature spread length 2^15)
-    [iPN, ~] = lsfrPN(iGen, iState, NumberOfChips);
-    [qPN, ~] = lsfrPN(qGen, qState, NumberOfChips);
-    
-    % IQ modulated PN sequence
-    PNSequence = - sign(iPN-1/2) - 1i*sign(qPN-1/2);
+    % generating PN sequence
+    PNSequence     = genPN(NumberOfChipsPerUser);
 
     % Convolutional encoder
     ConvolutionalGeneratorPolynoms = [753 561];
@@ -58,13 +39,12 @@ function BER = simulator(P)
         'TrellisStructure', poly2trellis(ConstraintLength, ConvolutionalGeneratorPolynoms)...
     );
     
-
     % Channel
     switch P.ChannelType
         case 'Multipath'
-            NumberOfChipsRX = NumberOfChips+P.ChannelLength-1;
+            NumberOfChipsRX = NumberOfChipsPerUser+P.ChannelLength-1;
         otherwise
-            NumberOfChipsRX = NumberOfChips;
+            NumberOfChipsRX = NumberOfChipsPerUser;
     end
     
     
@@ -78,7 +58,7 @@ function BER = simulator(P)
         Bits = randi([0 1], NumberOfBits/Users, Users); % Random Data
 
         % Convolutional encoding: rate 1/2
-        EncBits = zeros(NumberOfEncodedBits/Users, Users);
+        EncBits = zeros(NumberOfEncBits/Users, Users);
         for i = 1:Users
             EncBits(:,i) = step(encoder, Bits(:,i));
         end
@@ -99,7 +79,7 @@ function BER = simulator(P)
         waveform = txsymbols(:).*PNSequence;
 
         % reshape to add multi RX antenna suppport
-        waveform  = reshape(waveform,1,NumberOfChips);
+        waveform  = reshape(waveform,1,NumberOfChipsPerUser);
         mwaveform = repmat(waveform,[1 1 Users]);
 
         % Channel
@@ -131,7 +111,7 @@ function BER = simulator(P)
                 case 'AWGN'
                     y = mwaveform + noise;
                 case 'Multipath'     
-                    y = zeros(1,NumberOfChips+P.ChannelLength-1,Users);
+                    y = zeros(1,NumberOfChipsPerUser+P.ChannelLength-1,Users);
                     for i = 1:Users
                         y(1,:,i) = conv(mwaveform(1,:,i),himp(i,:)) + noise(1,:,i); 
                     end
@@ -146,20 +126,23 @@ function BER = simulator(P)
 
                     RxBits = zeros(Users,NumberOfBits/Users);
 
-                    for rr=1:Users
+                    for rr = 1:Users
                         UserSequence = SpreadSequence(:,rr);
+                        
+                        FrameLength = NumberOfChipsPerUser;
 
-                        FrameLength = NumberOfChipsRX;
+                        fingers = zeros(P.ChannelLength,NumberOfEncBitsPerUser);
 
-                        fingers = zeros(P.ChannelLength,NumberOfEncodedBitsPerUser);
-
-                        for i=1:P.ChannelLength
+                        for i = 1:P.ChannelLength
                             data    =  y(1,i:i+FrameLength-1,rr)./PNSequence.'; 
-                            rxvecs  = reshape(data,SeqLen,NumberOfEncodedBitsPerUser);
+                            rxvecs  = reshape(data,SeqLen,NumberOfEncBitsPerUser);
                             fingers(i,:) = 1/SeqLen * UserSequence.' * rxvecs;
                         end
-                        mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
+                        
                         % Symbols for soft decoder
+                        mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
+                        
+                        % Decoding the bits
                         decodedBitsForUser = step(decoder, real(mrc).');
                         RxBits(rr,:) = decodedBitsForUser(1:P.BitsPerUser);
                     end
@@ -167,14 +150,13 @@ function BER = simulator(P)
                 otherwise
                     error('Receiver not supported')
             end
-
-            Bits = reshape(Bits, NumberOfBits, 1);
-            RxBits = reshape(RxBits.', NumberOfBits, 1);
-
+            
+            % Flatten the bit vectors for BER count
+            Bits    = reshape(Bits, NumberOfBits, 1);
+            RxBits  = reshape(RxBits.', NumberOfBits, 1);
 
             % BER count
             errors =  sum(RxBits ~= Bits);
-
             Results(ss) = Results(ss) + errors;
 
         end
