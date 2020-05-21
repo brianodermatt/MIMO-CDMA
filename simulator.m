@@ -18,13 +18,13 @@ function BER = simulator(P)
     SpreadSequence = HadamardMatrix;
     SeqLen         = P.HadLen;
     
-    NumberOfBits            = (P.BitsPerUser * P.Modulation)* Users;                    % per Frame
-    NumberOfEncBits         = (NumberOfBits + (ConstraintLength-1)*Users)/P.ConvRate ;  % per Frame    
-    NumberOfEncBitsPerUser  = (NumberOfBits/Users + ConstraintLength-1)/P.ConvRate;     % per user, per Frame
-    NumberOfChipsPerUser    = NumberOfEncBits * SeqLen / Users;                         % per user, per Frame
+    NumOfBits            = (P.BitsPerUser * P.Modulation)* Users;                 % per Frame
+    NumOfEncBits         = (NumOfBits + (ConstraintLength-1)*Users)/P.ConvRate ;  % per Frame    
+    NumOfEncBitsPerUser  = (NumOfBits/Users + ConstraintLength-1)/P.ConvRate;     % per user, per Frame
+    NumOfChipsPerUser    = NumOfEncBits * SeqLen / Users;                         % per user, per Frame
     
     % generating PN sequence
-    PNSequence     = genPN(NumberOfChipsPerUser);
+    PNSequence     = genPN(NumOfChipsPerUser);
 
     % Convolutional encoder
     ConvolutionalGeneratorPolynoms = [753 561];
@@ -42,9 +42,9 @@ function BER = simulator(P)
     % Channel
     switch P.ChannelType
         case 'Multipath'
-            NumberOfChipsRX = NumberOfChipsPerUser+P.ChannelLength-1;
+            NumOfRXChipsPerUser = NumOfChipsPerUser+P.ChannelLength-1;
         otherwise
-            NumberOfChipsRX = NumberOfChipsPerUser;
+            NumOfRXChipsPerUser = NumOfChipsPerUser;
     end
     
     
@@ -53,12 +53,12 @@ function BER = simulator(P)
 
     for ii = 1:P.NumberOfFrames
 
-        ii
+        disp(['Simulating: ' sprintf('%3.f', ii/P.NumberOfFrames*100) '%'])
 
-        Bits = randi([0 1], NumberOfBits/Users, Users); % Random Data
+        Bits = randi([0 1], NumOfBits/Users, Users); % Random Data
 
         % Convolutional encoding: rate 1/2
-        EncBits = zeros(NumberOfEncBits/Users, Users);
+        EncBits = zeros(NumOfEncBits/Users, Users);
         for i = 1:Users
             EncBits(:,i) = step(encoder, Bits(:,i));
         end
@@ -79,7 +79,7 @@ function BER = simulator(P)
         waveform = txsymbols(:).*PNSequence;
 
         % reshape to add multi RX antenna suppport
-        waveform  = reshape(waveform,1,NumberOfChipsPerUser);
+        waveform  = reshape(waveform,1,NumOfChipsPerUser);
         mwaveform = repmat(waveform,[1 1 Users]);
 
         % Channel
@@ -96,13 +96,14 @@ function BER = simulator(P)
 
         %%%
         % Simulation
-        snoise = randn(1,NumberOfChipsRX,Users) + 1i* randn(1,NumberOfChipsRX,Users);
+        snoise = randn(1,NumOfRXChipsPerUser,Users) + 1i * randn(1,NumOfRXChipsPerUser,Users);
 
         % SNR Range
         for ss = 1:length(P.SNRRange)
             SNRdb  = P.SNRRange(ss);
             SNRlin = 10^(SNRdb/10);
-            noise  = 1/sqrt(2*SeqLen*SNRlin) *snoise;
+            % normalize noise according to SNR and 
+            noise  = 1/sqrt(2*SNRlin*SeqLen) * snoise;
 
             % Channel
             switch P.ChannelType
@@ -111,7 +112,7 @@ function BER = simulator(P)
                 case 'AWGN'
                     y = mwaveform + noise;
                 case 'Multipath'     
-                    y = zeros(1,NumberOfChipsPerUser+P.ChannelLength-1,Users);
+                    y = zeros(1,NumOfChipsPerUser+P.ChannelLength-1,Users);
                     for i = 1:Users
                         y(1,:,i) = conv(mwaveform(1,:,i),himp(i,:)) + noise(1,:,i); 
                     end
@@ -119,23 +120,22 @@ function BER = simulator(P)
                     error('Channel not supported')
             end
 
-
             % Receiver
             switch P.ReceiverType
                 case 'Rake'
 
-                    RxBits = zeros(Users,NumberOfBits/Users);
+                    RxBits = zeros(Users,NumOfBits/Users);
 
                     for rr = 1:Users
                         UserSequence = SpreadSequence(:,rr);
                         
-                        FrameLength = NumberOfChipsPerUser;
+                        FrameLength = NumOfChipsPerUser;
 
-                        fingers = zeros(P.ChannelLength,NumberOfEncBitsPerUser);
+                        fingers = zeros(P.ChannelLength,NumOfEncBitsPerUser);
 
                         for i = 1:P.ChannelLength
                             data    =  y(1,i:i+FrameLength-1,rr)./PNSequence.'; 
-                            rxvecs  = reshape(data,SeqLen,NumberOfEncBitsPerUser);
+                            rxvecs  = reshape(data,SeqLen,NumOfEncBitsPerUser);
                             fingers(i,:) = 1/SeqLen * UserSequence.' * rxvecs;
                         end
                         
@@ -152,8 +152,8 @@ function BER = simulator(P)
             end
             
             % Flatten the bit vectors for BER count
-            Bits    = reshape(Bits, NumberOfBits, 1);
-            RxBits  = reshape(RxBits.', NumberOfBits, 1);
+            Bits    = reshape(Bits, NumOfBits, 1);
+            RxBits  = reshape(RxBits.', NumOfBits, 1);
 
             % BER count
             errors =  sum(RxBits ~= Bits);
@@ -162,5 +162,5 @@ function BER = simulator(P)
         end
     end
 
-    BER = Results/(NumberOfBits*P.NumberOfFrames);
+    BER = Results/(NumOfBits*P.NumberOfFrames);
 end
