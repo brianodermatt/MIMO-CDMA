@@ -7,8 +7,8 @@
 clc; clear all; close all;
 
 % Parameters
-P.NumberOfFrames	= 1000;      % Total number of sent frames
-P.BitsPerUser       = 172;      % Bits per frame that each user is given, for 9600bps frame according to spec 
+P.NumberOfFrames	= 500;      % Total number of sent frames
+P.BitsPerUser       = 1000;      % Bits per frame that each user is given, for 9600bps frame according to spec 
 P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
 P.ConstrLen         = 9;        % Constraint length of convolutional encoder
 P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
