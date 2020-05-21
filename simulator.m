@@ -10,21 +10,31 @@ function BER = simulator(P)
        error('More users than available sequences')
     end
     
+    if P.RakeFingers > P.ChannelLength
+       warning('More Rx fingers than available channel taps. Setting the number of fingers to the maximum possible value.')
+       P.RakeFingers = P.ChannelLength;
+    end
+    
     % Initial values and constants
-    ConstraintLength = P.ConstrLen;
-    Users = P.CDMAUsers;
+    ConstraintLength     = P.ConstrLen;
+    Users                = P.CDMAUsers;
     
-    HadamardMatrix = hadamard(P.HadLen)/sqrt(P.HadLen);
-    SpreadSequence = HadamardMatrix;
-    SeqLen         = P.HadLen;
+    HadamardMatrix       = hadamard(P.HadLen)/sqrt(P.HadLen);
+    SpreadSequence       = HadamardMatrix;
+    SeqLen               = P.HadLen;
     
-    NumOfBits            = (P.BitsPerUser * P.Modulation)* Users;                 % per Frame
-    NumOfEncBits         = (NumOfBits + (ConstraintLength-1)*Users)/P.ConvRate ;  % per Frame    
-    NumOfEncBitsPerUser  = (NumOfBits/Users + ConstraintLength-1)/P.ConvRate;     % per user, per Frame
-    NumOfChipsPerUser    = NumOfEncBits * SeqLen / Users;                         % per user, per Frame
+    % Total number of bits per frame:
+    NumOfBits            = P.BitsPerUser * Users;
+    
+    % Total number of encoded bits per frame: the convolutional encoder
+    % adds a tail of bits that does not carry information.
+    NumOfEncBits         = (NumOfBits + (ConstraintLength-1)*Users)/P.ConvRate;
+    
+    % Number of chips per user, per frame:
+    NumOfChipsPerUser    = NumOfEncBits * SeqLen / Users;
     
     % generating PN sequence
-    PNSequence     = genPN(NumOfChipsPerUser);
+    PNSequence           = genPN(NumOfChipsPerUser);
 
     % Convolutional encoder
     ConvolutionalGeneratorPolynoms = [753 561];
@@ -42,6 +52,8 @@ function BER = simulator(P)
     % Channel
     switch P.ChannelType
         case 'Multipath'
+            % The convolution of the noisy symbols with channel impulse
+            % response adds a convolution tail:
             NumOfRXChipsPerUser = NumOfChipsPerUser+P.ChannelLength-1;
         otherwise
             NumOfRXChipsPerUser = NumOfChipsPerUser;
@@ -53,8 +65,10 @@ function BER = simulator(P)
 
     for ii = 1:P.NumberOfFrames
 
-        disp(['Simulating: ' sprintf('%3.f', ii/P.NumberOfFrames*100) '%'])
-
+        disp(['Simulating: ' sprintf('%.2f', ii/P.NumberOfFrames*100) '%'])
+        
+        % Information bits (already initialized in a user matrix to avoid
+        % reshaping for the encoder)
         Bits = randi([0 1], NumOfBits/Users, Users); % Random Data
 
         % Convolutional encoding: rate 1/2
@@ -62,23 +76,17 @@ function BER = simulator(P)
         for i = 1:Users
             EncBits(:,i) = step(encoder, Bits(:,i));
         end
-        EncBits = EncBits.';
 
-        % Modulation
-        switch P.Modulation % Modulate Symbols
-            case 1 % BPSK
-                symbols = -(2*EncBits - 1);
-            otherwise
-                error('Modulation not supported')
-        end
+        % BPSK Modulation
+        symbols = -(2*EncBits - 1);
 
         % Orthogonal spreading
-        txsymbols = SpreadSequence(:,1:Users) * symbols;
+        txsymbols = SpreadSequence(:,1:Users) * symbols.';
 
-        % apply PN sequence
+        % Applying PN sequence
         waveform = txsymbols(:).*PNSequence;
 
-        % reshape to add multi RX antenna suppport
+        % Reshape to add multi-user antenna suppport
         waveform  = reshape(waveform,1,NumOfChipsPerUser);
         mwaveform = repmat(waveform,[1 1 Users]);
 
@@ -94,15 +102,15 @@ function BER = simulator(P)
                 error('Channel not supported')
         end
 
-        %%%
-        % Simulation
+        % Noise initialization (Power = 1 [W])
         snoise = randn(1,NumOfRXChipsPerUser,Users) + 1i * randn(1,NumOfRXChipsPerUser,Users);
 
         % SNR Range
         for ss = 1:length(P.SNRRange)
             SNRdb  = P.SNRRange(ss);
             SNRlin = 10^(SNRdb/10);
-            % normalize noise according to SNR and 
+            % Normalize noise according to SNR (noise power) and spreading
+            % factor (noise is equally distributed over the chips)
             noise  = 1/sqrt(2*SNRlin*SeqLen) * snoise;
 
             % Channel
@@ -120,43 +128,37 @@ function BER = simulator(P)
                     error('Channel not supported')
             end
 
-            % Receiver
-            switch P.ReceiverType
-                case 'Rake'
-
-                    RxBits = zeros(Users,NumOfBits/Users);
-
-                    for rr = 1:Users
-                        UserSequence = SpreadSequence(:,rr);
-                        
-                        FrameLength = NumOfChipsPerUser;
-
-                        fingers = zeros(P.ChannelLength,NumOfEncBitsPerUser);
-
-                        for i = 1:P.ChannelLength
-                            data    =  y(1,i:i+FrameLength-1,rr)./PNSequence.'; 
-                            rxvecs  = reshape(data,SeqLen,NumOfEncBitsPerUser);
-                            fingers(i,:) = 1/SeqLen * UserSequence.' * rxvecs;
-                        end
-                        
-                        % Symbols for soft decoder
-                        mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
-                        
-                        % Decoding the bits
-                        decodedBitsForUser = step(decoder, real(mrc).');
-                        RxBits(rr,:) = decodedBitsForUser(1:P.BitsPerUser);
-                    end
-
-                otherwise
-                    error('Receiver not supported')
-            end
+            % Rake receiver and decoder
+            RxBits = zeros(Users,NumOfBits/Users);
             
+            for rr = 1:Users
+                UserSequence = SpreadSequence(:,rr);
+                
+                fingers = zeros(P.ChannelLength,NumOfEncBits/Users);
+
+                for i = 1:P.RakeFingers
+                    data    =  y(1,i:i+NumOfChipsPerUser-1,rr)./PNSequence.'; 
+                    rxvecs  = reshape(data,SeqLen,NumOfEncBits/Users);
+                    fingers(i,:) = 1/SeqLen * UserSequence.' * rxvecs;
+                end
+
+                % Symbols for soft decoder
+                mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
+
+                % Decoding the bits: soft Viterbi decoder
+                DecodedBits = step(decoder, real(mrc).');
+                
+                % Eliminating convolution tails
+                RxBits(rr,:) = DecodedBits(1:P.BitsPerUser);
+                
+            end
+
             % Flatten the bit vectors for BER count
             Bits    = reshape(Bits, NumOfBits, 1);
             RxBits  = reshape(RxBits.', NumOfBits, 1);
 
             % BER count
-            errors =  sum(RxBits ~= Bits);
+            errors      = sum(RxBits ~= Bits);
             Results(ss) = Results(ss) + errors;
 
         end

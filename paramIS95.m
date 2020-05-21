@@ -7,41 +7,45 @@
 clc; clear all; close all;
 
 % Parameters
-P.NumberOfFrames	= 250;      % Total number of sent frames
+P.NumberOfFrames	= 1000;      % Total number of sent frames
 P.BitsPerUser       = 172;      % Bits per frame that each user is given, for 9600bps frame according to spec 
-P.Modulation        = 1;        % Only BPSK (1)
-P.CDMAUsers         = 3;        % Total number of users
 P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
 P.ConstrLen         = 9;        % Constraint length of convolutional encoder
 P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
-P.ReceiverType      = 'Rake';	% Only 'Rake'
+P.SNRRange          = -28:-10;  % SNR Range to simulate in dB
 
-% % Parameters for AWGN or Bypass channels
+% Parameters for AWGN or Bypass channels
 % P.ChannelType       = 'AWGN';	% Set 'Bypass' for no channel effect
 % P.ChannelLength     = 1;        % It must be one, otherwise error
 
 % Parameters for Multipath channel
 P.ChannelType       = 'Multipath';
-P.ChannelLength     = 3;
 
-P.SNRRange = -28:-18; % SNR Range to simulate in dB
+P.CDMAUsers = 1;
+P.ChannelLength = 3;
+P.RakeFingers = 3;
+BER1 = simulator(P);
+sim1 = sprintf('Ch. length: %d - Users: %d - Fingers: %d' , P.ChannelLength,P.CDMAUsers,P.RakeFingers);
 
-BER = simulator(P);
+P.CDMAUsers = 2;
+P.ChannelLength = 3;
+P.RakeFingers = 3;
+BER2 = simulator(P);
+sim2 = sprintf('Ch. length: %d - Users: %d - Fingers: %d' , P.ChannelLength,P.CDMAUsers,P.RakeFingers);
 
-simlab = sprintf('%s - Length: %d - Users: %d' ,P.ChannelType,P.ChannelLength,P.CDMAUsers);
+P.CDMAUsers = 3;
+P.ChannelLength = 3;
+P.RakeFingers = 3;
+BER3 = simulator(P);
+sim3 = sprintf('Ch. length: %d - Users: %d - Fingers: %d' , P.ChannelLength,P.CDMAUsers,P.RakeFingers);
 
-figure(1);
-semilogy(P.SNRRange,BER,'ro-','DisplayName',simlab,'LineWidth',2);
+figure();
+semilogy(P.SNRRange,BER1,'DisplayName',sim1);
 hold on;
-xlabel('SNR','FontSize',12,'FontWeight','bold');
+semilogy(P.SNRRange,BER2,'DisplayName',sim2);
+semilogy(P.SNRRange,BER3,'DisplayName',sim3);
+xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
 ylabel('BER','FontSize',12,'FontWeight','bold');
 xlim([min(P.SNRRange) max(P.SNRRange)]);
-
-
-%% 64 users
-P.CDMAUsers         = 12;        % Total number of users
-BER = simulator(P);
-simlab = sprintf('%s - Length: %d - Users: %d' ,P.ChannelType,P.ChannelLength,P.CDMAUsers);
-semilogy(P.SNRRange,BER,'bo-','DisplayName',simlab,'LineWidth',2);
-
+grid minor;
 legend('-DynamicLegend');
