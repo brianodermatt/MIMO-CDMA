@@ -13,6 +13,8 @@ P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
 P.ConstrLen         = 9;        % Constraint length of convolutional encoder
 P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
 P.SNRRange          = -28:-10;  % SNR Range to simulate in dB
+P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
+P.NumberRxAntennas  = 3;        % Number of receive antennas for MIMO
 
 % Parameters for AWGN or Bypass channels
 % P.ChannelType       = 'AWGN';	% Set 'Bypass' for no channel effect
@@ -21,21 +23,27 @@ P.SNRRange          = -28:-10;  % SNR Range to simulate in dB
 % Parameters for Multipath channel
 P.ChannelType       = 'Multipath';
 
-P.CDMAUsers = 1;
-P.ChannelLength = 3;
-P.RakeFingers = 3;
-BER1 = simulator(P);
-sim1 = sprintf('Ch. length: %d - Users: %d - Fingers: %d' , P.ChannelLength,P.CDMAUsers,P.RakeFingers);
+% P.CDMAUsers = 1;
+% P.ChannelLength = 3;
+% P.RakeFingers = 3;
+% BER1 = simulator(P);
+% sim1 = sprintf('Ch. length: %d - Users: %d - Fingers: %d' , P.ChannelLength,P.CDMAUsers,P.RakeFingers);
+% 
+% P.CDMAUsers = 2;
+% P.ChannelLength = 3;
+% P.RakeFingers = 3;
+% BER2 = simulator(P);
+% sim2 = sprintf('Ch. length: %d - Users: %d - Fingers: %d' , P.ChannelLength,P.CDMAUsers,P.RakeFingers);
+% 
+% P.CDMAUsers = 3;
+% P.ChannelLength = 3;
+% P.RakeFingers = 3;
+% BER3 = simulator(P);
+% sim3 = sprintf('Ch. length: %d - Users: %d - Fingers: %d' , P.ChannelLength,P.CDMAUsers,P.RakeFingers);
 
-P.CDMAUsers = 2;
-P.ChannelLength = 3;
-P.RakeFingers = 3;
-BER2 = simulator(P);
-sim2 = sprintf('Ch. length: %d - Users: %d - Fingers: %d' , P.ChannelLength,P.CDMAUsers,P.RakeFingers);
-
-P.CDMAUsers = 3;
-P.ChannelLength = 3;
-P.RakeFingers = 3;
+P.CDMAUsers = 4;
+P.ChannelLength = 5;
+P.RakeFingers = 5;
 BER3 = simulator(P);
 sim3 = sprintf('Ch. length: %d - Users: %d - Fingers: %d' , P.ChannelLength,P.CDMAUsers,P.RakeFingers);
 

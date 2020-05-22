@@ -88,22 +88,28 @@ function BER = simulator(P)
 
         % Reshape to add multi-user antenna suppport
         waveform  = reshape(waveform,1,NumOfChipsPerUser);
-        mwaveform = repmat(waveform,[1 1 Users]);
+        mwaveform = repmat(waveform,[P.NumberTxAntennas 1 Users]);
 
         % Channel
         switch P.ChannelType
             case 'Bypass'
-                himp = ones(Users,1);
+                H = ones(Users, P.NumberRxAntennas*P.ChannelLength, P.NumberTxAntennas);
+                % himp = ones(Users,1);
             case 'AWGN'
-                himp = ones(Users,1);
+                H = ones(Users, P.NumberRxAntennas*P.ChannelLength, P.NumberTxAntennas);
+                % himp = ones(Users,1);
             case 'Multipath'
-                himp = sqrt(1/2)* ( randn(Users,P.ChannelLength) + 1i * randn(Users,P.ChannelLength) );
+                H = sqrt(1/2) * (...
+                      randn(Users, P.NumberRxAntennas*P.ChannelLength, P.NumberTxAntennas) +...
+                      1i*randn(Users, P.NumberRxAntennas*P.ChannelLength, P.NumberTxAntennas)...
+                    );
+                % himp = sqrt(1/2)* ( randn(Users,P.ChannelLength) + 1i * randn(Users,P.ChannelLength) );
             otherwise
                 error('Channel not supported')
         end
 
         % Noise initialization (Power = 1 [W])
-        snoise = randn(1,NumOfRXChipsPerUser,Users) + 1i * randn(1,NumOfRXChipsPerUser,Users);
+        snoise = randn(P.NumberRxAntennas,NumOfRXChipsPerUser,Users) + 1i * randn(P.NumberRxAntennas,NumOfRXChipsPerUser,Users);
 
         % SNR Range
         for ss = 1:length(P.SNRRange)
