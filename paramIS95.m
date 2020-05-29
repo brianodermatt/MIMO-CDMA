@@ -14,7 +14,7 @@ P.ConstrLen         = 9;        % Constraint length of convolutional encoder
 P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
 
 %P.SNRRange          = -28:-10;  % SNR Range to simulate in dB
-P.SNRRange = -30:1:-20;
+P.SNRRange          = -30:1:-15;
 
 P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
 P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
@@ -23,13 +23,13 @@ P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
 P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
 
 % Parameter for MIMO detection
-P.MIMODetectorType  = 'ZeroForcing';
+P.MIMODetectorType  = 'SIC';
 
 P.CDMAUsers = 2;
 P.ChannelLength = 3;
 P.RakeFingers = 3;
 BER = simulator(P);
-sim3 = sprintf('Ch. length: %d - Users: %d - Fingers: %d',P.ChannelLength,P.CDMAUsers,P.RakeFingers);
+sim3 = sprintf('Ch. len.:%d; Users:%d; Fingers:%d',P.ChannelLength,P.CDMAUsers,P.RakeFingers);
 
 figure();
 semilogy(P.SNRRange,BER,'DisplayName',sim3);

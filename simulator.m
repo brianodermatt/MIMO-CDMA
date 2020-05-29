@@ -152,15 +152,41 @@ function BER = simulator(P)
                 % estimation of the sent signal on each antenna
                 H_User = squeeze(H(i,:,:));
                 switch P.MIMODetectorType
-                    case 'ZeroForcing'
+                    case 'ZF'
                         H_H = H_User';
                         G = inv(H_H * H_User) * H_H;
                         sTilde = G * rakeAntennas;
-                        % could map to closest constellation point but
-                        % this would destroy information
+                        
+                    case 'MMSE'
+                        H_H = H_User';
+                        mult = H_H * H_User;
+                        G = inv(mult + P.NumberTxAntennas*SNRlin*eye(size(mult))) * H_H;
+                        sTilde = G * rakeAntennas;
+                        
+                    case 'SIC'
+                        yi = rakeAntennas;
+                        Hi = H_User;
+                        Constellations = [-1 1];    % here, the signal is BPSK
+                        for i = 1:P.NumberTxAntennas
+                            Hi_H = Hi';
+                            Hi_inv = inv(Hi_H * Hi) * Hi_H;
+                            g1i_star = Hi_inv(1,:);
+                            % here we actually produce sHats and not sTilde
+                            for kk = 1:NumOfEncBits/Users
+                                temp = g1i_star*yi;
+                                [~, closestIndex] = min(temp(kk) - Constellations);
+                                sTilde(i,kk) = Constellations(closestIndex);
+                            end
+                            yi = yi - Hi(:,1) * sTilde(i);
+                            Hi(:,1) = [];
+                        end
+                        
                     otherwise
                         error('MIMO Detector not supported');
                 end
+                
+                % could map to closest constellation point but
+                % this would destroy information
                 
                 % since all antennas sent the same data, we can average the
                 % estimates of each Tx antenna
