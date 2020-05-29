@@ -35,9 +35,6 @@ function BER = simulator(P)
     
     % generating PN sequence
     PNSequence           = genPN(NumOfChipsPerUser);
-    
-    % constellation points for MIMO decoder
-    Constellations       = [ 1+1i, 1-1i, -1+1i, -1-1i ];
 
     % Convolutional encoder
     ConvolutionalGeneratorPolynoms = [753 561];
@@ -95,44 +92,53 @@ function BER = simulator(P)
 
         % Channel
         switch P.ChannelType
-            case 'Bypass'
-                H = ones(Users, P.NumberRxAntennas*P.ChannelLength, P.NumberTxAntennas);
-            case 'AWGN'
-                H = ones(Users, P.NumberRxAntennas*P.ChannelLength, P.NumberTxAntennas);
+%             case 'Bypass'
+%                 H = ones(Users, P.NumberRxAntennas, P.NumberTxAntennas, P.ChannelLength);
+%             case 'AWGN'
+%                 H = ones(Users, P.NumberRxAntennas, P.NumberTxAntennas, P.ChannelLength);
             case 'Multipath'
                 H = sqrt(1/2) * (...
-                      randn(Users, P.NumberRxAntennas, P.NumberTxAntennas, P.ChannelLength) +...
-                      1i*randn(Users, P.NumberRxAntennas, P.NumberTxAntennas, P.ChannelLength)...
-                    );
+                    randn(Users, P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas) + ...
+                    1i * randn(Users, P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas) ...
+                );
             otherwise
                 error('Channel not supported')
         end
 
-        % Noise initialization (Power = 1 [W])
-        snoise = randn(P.NumberRxAntennas,NumOfRXChipsPerUser,Users) + 1i * randn(P.NumberRxAntennas,NumOfRXChipsPerUser,Users);
+        % Noise initialization (Power = 1 [W]). Independent noise
+        % realisation on each (virtual) Rx antenna
+        snoise = randn(P.ChannelLength * P.NumberRxAntennas, NumOfRXChipsPerUser, Users) + ...
+                 1i * randn(P.ChannelLength * P.NumberRxAntennas, NumOfRXChipsPerUser, Users);
 
         % SNR Range
         for ss = 1:length(P.SNRRange)
             SNRdb  = P.SNRRange(ss);
             SNRlin = 10^(SNRdb/10);
+            
             % Normalize noise according to SNR (noise power) and spreading
             % factor (noise is equally distributed over the chips)
             noise  = 1/sqrt(2*SNRlin*SeqLen) * snoise;
 
             % Channel
             switch P.ChannelType
-                case 'Bypass'
-                    y = mwaveform;
-                case 'AWGN'
-                    y = mwaveform + noise;
-                case 'Multipath'     
+%                 case 'Bypass'
+%                     mwaveform = repmat(waveform,[P.NumberRxAntennas 1 Users]);
+%                     y = mwaveform;
+%                 case 'AWGN'
+%                     mwaveform = repmat(waveform,[P.NumberRxAntennas 1 Users]);
+%                     y = mwaveform + noise;
+                case 'Multipath'
                     y = zeros(P.NumberRxAntennas, NumOfChipsPerUser + P.ChannelLength-1, Users);
                     for i = 1:Users
-                       for j = 1:P.NumberRxAntennas
-                          for k = 1:P.NumberTxAntennas
-                              y(j,:,i) = y(j,:,i) + conv(mwaveform(k,:,i), squeeze(H(i,j,k,:))) + noise(j,:,i);
-                          end
-                       end
+                        % Reshape into the form of eq. 2 of the assignment
+                        HConv = reshape(H(i,:,:), [P.ChannelLength, P.NumberRxAntennas, P.NumberTxAntennas]);
+                        for j = 1:P.NumberRxAntennas
+                            for k = 1:P.NumberTxAntennas
+                                % perform convolution as in eq. 5/6 of the assignment
+                                h_jk = HConv(:,j,k);
+                                y(j,:,i) = y(j,:,i) + conv(mwaveform(k,:,i), h_jk) + noise(j,:,i);
+                            end
+                        end
                     end
                 otherwise
                     error('Channel not supported')
@@ -142,64 +148,39 @@ function BER = simulator(P)
             for i = 1:Users
                 % first split up into virtual RAKE antennas. There are
                 % P.NumberRxAntennas*P.ChannelLength virtual antennas per user
-                        
-                UserSequence = SpreadSequence(:,i);
-                rakeAntennas = zeros(P.NumberRxAntennas,P.ChannelLength,NumOfEncBits/Users);                
+                UserSequence = SpreadSequence(:,i); 
+                rakeAntennas = zeros(P.NumberRxAntennas * P.ChannelLength, NumOfEncBits/Users);
                 for k = 1:P.NumberRxAntennas
                     for l = 1:P.RakeFingers
-                        data = y(k,l:l+NumOfChipsPerUser-1,i);
+                        data = y(k,l:l+NumOfChipsPerUser-1,i) ./ PNSequence.';
                         rxvecs  = reshape(data,SeqLen,NumOfEncBits/Users);
-                        rakeAntennas(k,l,:) = 1/SeqLen * UserSequence.' * rxvecs;
+                        rakeAntennas((k-1)*P.RakeFingers + l, :) = UserSequence.' * rxvecs;
                     end
                 end
             
-                % Then do MIMO for each of the virtual RAKE antennas before
-                % combining them
-                sTilde = zeros(P.RakeFingers, P.NumberTxAntennas, NumOfEncBits/Users);
-                sHat = zeros(size(sTilde));
-                for l = 1:P.RakeFingers
-                   Heff = squeeze(H(i,:,:,l));
-                   
-                   switch P.MIMODetectorType
-                        case 'ZeroForcing'
-                            H_H = Heff';
-                            G = inv(H_H * Heff) * H_H;
-                            sTilde(l,:,:) = G * squeeze(rakeAntennas(:,l,:));
-                            % could map to closest constellation point but
-                            % this would destroy information
-%                             for k = 1:P.NumberTxAntennas
-%                                 for m = 1:(NumOfEncBits/Users)
-%                                    [~,closestIndex] = min(sTilde(l,k,i) - Constellations);
-%                                    sHat(l,k,m) = Constellations(closestIndex);
-%                                 end
-%                             end
-                        otherwise
-                            error('MIMO Detector not supported');
-                    end
-                end
-                
-                % from sTilde, which is available for each RAKE finger on
-                % each Tx antenna
-                % combine the RAKE fingers
-                combinedRake = zeros(P.NumberTxAntennas, NumOfEncBits/Users);
-                for k = 1:P.NumberTxAntennas
-                    fingersToCombine = squeeze(sTilde(:,k,:));
-                    
-                    % since we inverted the channel effects already in the
-                    % MIMO detection, we can just average the contributions
-                    averager = ones(1, P.ChannelLength);
-                    combinedRake(k,:) = (1/norm(averager)) * conj(averager) * fingersToCombine;
+                % MIMO with the virtual RAKE antennas directly gives the
+                % estimation of the sent signal on each antenna
+                H_User = squeeze(H(i,:,:));
+                switch P.MIMODetectorType
+                    case 'ZeroForcing'
+                        H_H = H_User';
+                        G = inv(H_H * H_User) * H_H;
+                        sTilde = G * rakeAntennas;
+                        % could map to closest constellation point but
+                        % this would destroy information
+                    otherwise
+                        error('MIMO Detector not supported');
                 end
                 
                 % since all antennas sent the same data, we can average the
                 % estimates of each Tx antenna
-                mrc = mean(combinedRake,1);
+                mrc = mean(sTilde, 1);
                 
                 % Decoding the bits: soft Viterbi decoder
-                DecodedBits = step(decoder, real(mrc).');
+                decodedBits = step(decoder, real(mrc).');
                 
                 % Eliminating convolution tails
-                RxBits(i,:) = DecodedBits(1:P.BitsPerUser);
+                RxBits(i,:) = decodedBits(1:P.BitsPerUser);
             end
 
             % Flatten the bit vectors for BER count
