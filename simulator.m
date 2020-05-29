@@ -92,10 +92,6 @@ function BER = simulator(P)
 
         % Channel
         switch P.ChannelType
-%             case 'Bypass'
-%                 H = ones(Users, P.NumberRxAntennas, P.NumberTxAntennas, P.ChannelLength);
-%             case 'AWGN'
-%                 H = ones(Users, P.NumberRxAntennas, P.NumberTxAntennas, P.ChannelLength);
             case 'Multipath'
                 H = sqrt(1/2) * (...
                     randn(Users, P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas) + ...
@@ -121,12 +117,6 @@ function BER = simulator(P)
 
             % Channel
             switch P.ChannelType
-%                 case 'Bypass'
-%                     mwaveform = repmat(waveform,[P.NumberRxAntennas 1 Users]);
-%                     y = mwaveform;
-%                 case 'AWGN'
-%                     mwaveform = repmat(waveform,[P.NumberRxAntennas 1 Users]);
-%                     y = mwaveform + noise;
                 case 'Multipath'
                     y = zeros(P.NumberRxAntennas, NumOfChipsPerUser + P.ChannelLength-1, Users);
                     for i = 1:Users

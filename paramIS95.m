@@ -19,12 +19,8 @@ P.SNRRange = -30:1:-20;
 P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
 P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
 
-% Parameters for AWGN or Bypass channels
-% P.ChannelType       = 'AWGN';	% Set 'Bypass' for no channel effect
-% P.ChannelLength     = 1;        % It must be one, otherwise error
-
 % Parameters for Multipath channel
-P.ChannelType       = 'Multipath';
+P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
 
 % Parameter for MIMO detection
 P.MIMODetectorType  = 'ZeroForcing';
