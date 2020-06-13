@@ -126,8 +126,9 @@ function BER = simulator(P)
                             for k = 1:P.NumberTxAntennas
                                 % perform convolution as in eq. 5/6 of the assignment
                                 h_jk = HConv(:,j,k);
-                                y(j,:,i) = y(j,:,i) + conv(mwaveform(k,:,i), h_jk) + noise(j,:,i);
+                                y(j,:,i) = y(j,:,i) + conv(mwaveform(k,:,i), h_jk);
                             end
+                            y(j,:,i) = y(j,:,i) + noise(j,:,i);
                         end
                     end
                 otherwise
@@ -141,10 +142,10 @@ function BER = simulator(P)
                 UserSequence = SpreadSequence(:,i); 
                 rakeAntennas = zeros(P.NumberRxAntennas * P.ChannelLength, NumOfEncBits/Users);
                 for k = 1:P.NumberRxAntennas
-                    for l = 1:P.RakeFingers
-                        data = y(k,l:l+NumOfChipsPerUser-1,i) ./ PNSequence.';
+                    for m = 1:P.RakeFingers
+                        data = y(k,m:m+NumOfChipsPerUser-1,i) ./ PNSequence.';
                         rxvecs  = reshape(data,SeqLen,NumOfEncBits/Users);
-                        rakeAntennas((k-1)*P.RakeFingers + l, :) = UserSequence.' * rxvecs;
+                        rakeAntennas((k-1)*P.RakeFingers + m, :) = UserSequence.' * rxvecs;
                     end
                 end
             
