@@ -88,69 +88,115 @@ function BER = simulator(P)
 
         % Reshape to add multi-user antenna suppport
         waveform  = reshape(waveform,1,NumOfChipsPerUser);
-        mwaveform = repmat(waveform,[1 1 Users]);
+        mwaveform = repmat(waveform,[P.NumberTxAntennas 1 Users]);
 
         % Channel
         switch P.ChannelType
-            case 'Bypass'
-                himp = ones(Users,1);
-            case 'AWGN'
-                himp = ones(Users,1);
             case 'Multipath'
-                himp = sqrt(1/2)* ( randn(Users,P.ChannelLength) + 1i * randn(Users,P.ChannelLength) );
+                H = sqrt(1/2) * (...
+                    randn(Users, P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas) + ...
+                    1i * randn(Users, P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas) ...
+                );
             otherwise
                 error('Channel not supported')
         end
 
-        % Noise initialization (Power = 1 [W])
-        snoise = randn(1,NumOfRXChipsPerUser,Users) + 1i * randn(1,NumOfRXChipsPerUser,Users);
+        % Noise initialization (Power = 1 [W]). Independent noise
+        % realisation on each (virtual) Rx antenna
+        snoise = randn(P.ChannelLength * P.NumberRxAntennas, NumOfRXChipsPerUser, Users) + ...
+                 1i * randn(P.ChannelLength * P.NumberRxAntennas, NumOfRXChipsPerUser, Users);
 
         % SNR Range
         for ss = 1:length(P.SNRRange)
             SNRdb  = P.SNRRange(ss);
             SNRlin = 10^(SNRdb/10);
+            
             % Normalize noise according to SNR (noise power) and spreading
             % factor (noise is equally distributed over the chips)
             noise  = 1/sqrt(2*SNRlin*SeqLen) * snoise;
 
             % Channel
             switch P.ChannelType
-                case 'Bypass'
-                    y = mwaveform;
-                case 'AWGN'
-                    y = mwaveform + noise;
-                case 'Multipath'     
-                    y = zeros(1,NumOfChipsPerUser+P.ChannelLength-1,Users);
+                case 'Multipath'
+                    y = zeros(P.NumberRxAntennas, NumOfChipsPerUser + P.ChannelLength-1, Users);
                     for i = 1:Users
-                        y(1,:,i) = conv(mwaveform(1,:,i),himp(i,:)) + noise(1,:,i); 
+                        % Reshape into the form of eq. 2 of the assignment
+                        HConv = reshape(H(i,:,:), [P.ChannelLength, P.NumberRxAntennas, P.NumberTxAntennas]);
+                        for j = 1:P.NumberRxAntennas
+                            for k = 1:P.NumberTxAntennas
+                                % perform convolution as in eq. 5/6 of the assignment
+                                h_jk = HConv(:,j,k);
+                                y(j,:,i) = y(j,:,i) + conv(mwaveform(k,:,i), h_jk) + noise(j,:,i);
+                            end
+                        end
                     end
                 otherwise
                     error('Channel not supported')
             end
-
-            % Rake receiver and decoder
-            RxBits = zeros(Users,NumOfBits/Users);
             
-            for rr = 1:Users
-                UserSequence = SpreadSequence(:,rr);
-                
-                fingers = zeros(P.ChannelLength,NumOfEncBits/Users);
-
-                for i = 1:P.RakeFingers
-                    data    =  y(1,i:i+NumOfChipsPerUser-1,rr)./PNSequence.'; 
-                    rxvecs  = reshape(data,SeqLen,NumOfEncBits/Users);
-                    fingers(i,:) = 1/SeqLen * UserSequence.' * rxvecs;
+            RxBits = zeros(Users,NumOfBits/Users);
+            for i = 1:Users
+                % first split up into virtual RAKE antennas. There are
+                % P.NumberRxAntennas*P.ChannelLength virtual antennas per user
+                UserSequence = SpreadSequence(:,i); 
+                rakeAntennas = zeros(P.NumberRxAntennas * P.ChannelLength, NumOfEncBits/Users);
+                for k = 1:P.NumberRxAntennas
+                    for l = 1:P.RakeFingers
+                        data = y(k,l:l+NumOfChipsPerUser-1,i) ./ PNSequence.';
+                        rxvecs  = reshape(data,SeqLen,NumOfEncBits/Users);
+                        rakeAntennas((k-1)*P.RakeFingers + l, :) = UserSequence.' * rxvecs;
+                    end
                 end
-
-                % Symbols for soft decoder
-                mrc = (1/norm(himp(rr,:))) * conj(himp(rr,:)) * fingers;
-
+            
+                % MIMO with the virtual RAKE antennas directly gives the
+                % estimation of the sent signal on each antenna
+                H_User = squeeze(H(i,:,:));
+                switch P.MIMODetectorType
+                    case 'ZF'
+                        H_H = H_User';
+                        G = inv(H_H * H_User) * H_H;
+                        sTilde = G * rakeAntennas;
+                        
+                    case 'MMSE'
+                        H_H = H_User';
+                        mult = H_H * H_User;
+                        G = inv(mult + P.NumberTxAntennas*SNRlin*eye(size(mult))) * H_H;
+                        sTilde = G * rakeAntennas;
+                        
+                    case 'SIC'
+                        yi = rakeAntennas;
+                        Hi = H_User;
+                        Constellations = [-1 1];    % here, the signal is BPSK
+                        for i = 1:P.NumberTxAntennas
+                            Hi_H = Hi';
+                            Hi_inv = inv(Hi_H * Hi) * Hi_H;
+                            g1i_star = Hi_inv(1,:);
+                            % here we actually produce sHats and not sTilde
+                            for kk = 1:NumOfEncBits/Users
+                                temp = g1i_star*yi;
+                                [~, closestIndex] = min(temp(kk) - Constellations);
+                                sTilde(i,kk) = Constellations(closestIndex);
+                            end
+                            yi = yi - Hi(:,1) * sTilde(i);
+                            Hi(:,1) = [];
+                        end
+                        
+                    otherwise
+                        error('MIMO Detector not supported');
+                end
+                
+                % could map to closest constellation point but
+                % this would destroy information
+                
+                % since all antennas sent the same data, we can average the
+                % estimates of each Tx antenna
+                mrc = mean(sTilde, 1);
+                
                 % Decoding the bits: soft Viterbi decoder
-                DecodedBits = step(decoder, real(mrc).');
+                decodedBits = step(decoder, real(mrc).');
                 
                 % Eliminating convolution tails
-                RxBits(rr,:) = DecodedBits(1:P.BitsPerUser);
-                
+                RxBits(i,:) = decodedBits(1:P.BitsPerUser);
             end
 
             % Flatten the bit vectors for BER count
