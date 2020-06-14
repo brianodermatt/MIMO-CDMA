@@ -82,7 +82,7 @@ function BER = simulator(P)
 
         % Orthogonal spreading
         txsymbols = SpreadSequence(:,1:Users) * symbols.';
-
+        
         % Applying PN sequence
         waveform = txsymbols(:).*PNSequence;
 
