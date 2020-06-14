@@ -94,8 +94,8 @@ function BER = simulator(P)
         switch P.ChannelType
             case 'Multipath'
                 H = sqrt(1/2) * (...
-                    randn(Users, P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas) + ...
-                    1i * randn(Users, P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas) ...
+                    randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users) + ...
+                    1i * randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users) ...
                 );
             otherwise
                 error('Channel not supported')
@@ -121,7 +121,7 @@ function BER = simulator(P)
                     y = zeros(P.NumberRxAntennas, NumOfChipsPerUser + P.ChannelLength-1, Users);
                     for i = 1:Users
                         % Reshape into the form of eq. 2 of the assignment
-                        HConv = reshape(H(i,:,:), [P.ChannelLength, P.NumberRxAntennas, P.NumberTxAntennas]);
+                        HConv = reshape(H(:,:,i), [P.ChannelLength, P.NumberRxAntennas, P.NumberTxAntennas]);
                         for j = 1:P.NumberRxAntennas
                             for k = 1:P.NumberTxAntennas
                                 % perform convolution as in eq. 5/6 of the assignment
@@ -151,7 +151,7 @@ function BER = simulator(P)
             
                 % MIMO with the virtual RAKE antennas directly gives the
                 % estimation of the sent signal on each antenna
-                H_User = squeeze(H(i,:,:));
+                H_User = squeeze(H(:,:,i));
                 switch P.MIMODetectorType
                     case 'ZF'
                         H_H = H_User';
