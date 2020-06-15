@@ -11,7 +11,8 @@ function BER = simulator(P)
     end
     
     if P.RakeFingers > P.ChannelLength
-       warning('More Rx fingers than available channel taps. Setting the number of fingers to the maximum possible value.')
+       warning('More Rx fingers than available channel taps.')
+       print('Setting the number of fingers to the maximum possible value.')
        P.RakeFingers = P.ChannelLength;
     end
     
@@ -19,6 +20,8 @@ function BER = simulator(P)
     ConstraintLength     = P.ConstrLen;
     Users                = P.CDMAUsers;
     
+    % Normalized Hadamard matrix: 
+    % normalize so that the total symbol power does not change
     HadamardMatrix       = hadamard(P.HadLen)/sqrt(P.HadLen);
     SpreadSequence       = HadamardMatrix;
     SeqLen               = P.HadLen;
@@ -26,14 +29,15 @@ function BER = simulator(P)
     % Total number of bits per frame:
     NumOfBits            = P.BitsPerUser * Users;
     
-    % Total number of encoded bits per frame: the convolutional encoder
-    % adds a tail of bits that does not carry information.
+    % Total number of encoded bits per frame: 
+    % the convolutional encoder adds a termination tail of bits that 
+    % does not carry information.
     NumOfEncBits         = (NumOfBits + (ConstraintLength-1)*Users)/P.ConvRate;
     
     % Number of chips per user, per frame:
     NumOfChipsPerUser    = NumOfEncBits * SeqLen / Users;
     
-    % generating PN sequence
+    % Generating PN sequence
     PNSequence           = genPN(NumOfChipsPerUser);
 
     % Convolutional encoder
@@ -59,17 +63,18 @@ function BER = simulator(P)
             NumOfRXChipsPerUser = NumOfChipsPerUser;
     end
     
-    
+    % Initialize variable for error counting
     Results = zeros(1,length(P.SNRRange));
-
 
     for ii = 1:P.NumberOfFrames
 
         disp(['Simulating: ' sprintf('%.2f', ii/P.NumberOfFrames*100) '%'])
         
-        % Information bits (already initialized in a user matrix to avoid
-        % reshaping for the encoder)
-        Bits = randi([0 1], NumOfBits/Users, Users); % Random Data
+        %% Transmitter
+        
+        % Information bits: random bit strings in a
+        % user matrix: each column represents a user string
+        Bits = randi([0 1], NumOfBits/Users, Users);
 
         % Convolutional encoding: rate 1/2
         EncBits = zeros(NumOfEncBits/Users, Users);
@@ -77,32 +82,42 @@ function BER = simulator(P)
             EncBits(:,i) = step(encoder, Bits(:,i));
         end
 
-        % BPSK Modulation
-        symbols = -(2*EncBits - 1);
+        % BPSK Modulation:
+        % 0 ----> +1
+        % 1 ----> -1
+        symbols = 1 - 2*EncBits;
 
         % Orthogonal spreading
-        txsymbols = SpreadSequence(:,1:Users) * symbols.';
+        % Add here explanation on dimensions
+        txsymbols = SpreadSequence(:, 1:Users) * symbols.';
         
         % Applying PN sequence
+        % Add here explanation on dimensions: elementwise multiplication
         waveform = txsymbols(:).*PNSequence;
 
-        % Reshape to add multi-user antenna suppport
-        waveform  = reshape(waveform,1,NumOfChipsPerUser);
+        % Reshape to add multi-user antenna suppport:
+        % Add here explanation on dimensions
+        waveform  = reshape(waveform, 1, NumOfChipsPerUser);
         mwaveform = repmat(waveform,[P.NumberTxAntennas 1 Users]);
 
-        % Channel
+        
+        %% Channel and Noise Realizations
+
         switch P.ChannelType
             case 'Multipath'
+                % MIMO multipath channel matrix 
+                % Add here explanation on dimensions
+                % Add explanation on distribution of channel coefficients
                 H = sqrt(1/2) * (...
                     randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users) + ...
-                    1i * randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users) ...
-                );
+                    1i * randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users));
             otherwise
                 error('Channel not supported')
         end
 
-        % Noise initialization (Power = 1 [W]). Independent noise
-        % realisation on each (virtual) Rx antenna
+        % Noise initialization: 
+        % independent gaussian entries with unit variance (unit average power)
+        % Add here explanation on dimensions
         snoise = randn(P.ChannelLength * P.NumberRxAntennas, NumOfRXChipsPerUser, Users) + ...
                  1i * randn(P.ChannelLength * P.NumberRxAntennas, NumOfRXChipsPerUser, Users);
 
@@ -111,31 +126,49 @@ function BER = simulator(P)
             SNRdb  = P.SNRRange(ss);
             SNRlin = 10^(SNRdb/10);
             
-            % Normalize noise according to SNR (noise power) and spreading
-            % factor (noise is equally distributed over the chips)
-            noise  = 1/sqrt(2*SNRlin*SeqLen) * snoise;
+            % Normalize noise according to 
+            % 1. SNR: If signal is normalized to 1, 1/SNR is the noise power;
+            % 2. Factor 2: Noise power is equally distributed over the real and imaginary parts;
+            % 3. Spread factor: noise is equally distributed over the chips.
+            norm_factor = 1/sqrt(2*SNRlin*SeqLen);
+            noise  = norm_factor * snoise;
 
-            % Channel
+            %% Channel Transmission
             switch P.ChannelType
                 case 'Multipath'
-                    y = zeros(P.NumberRxAntennas, NumOfChipsPerUser + P.ChannelLength-1, Users);
+                    
+                    % Add here explanation on dimensions
+                    y = zeros(P.NumberRxAntennas, NumOfChipsPerUser+P.ChannelLength-1, Users);
+                    
                     for i = 1:Users
                         % Reshape into the form of eq. 2 of the assignment
+                        % Add here explanation on dimensions
                         HConv = reshape(H(:,:,i), [P.ChannelLength, P.NumberRxAntennas, P.NumberTxAntennas]);
+                        
                         for j = 1:P.NumberRxAntennas
+                            
                             for k = 1:P.NumberTxAntennas
                                 % perform convolution as in eq. 5/6 of the assignment
                                 h_jk = HConv(:,j,k);
                                 y(j,:,i) = y(j,:,i) + conv(mwaveform(k,:,i), h_jk);
                             end
+                            
                             y(j,:,i) = y(j,:,i) + noise(j,:,i);
+                            
                         end
                     end
+                    
                 otherwise
                     error('Channel not supported')
             end
             
-            RxBits = zeros(Users,NumOfBits/Users);
+            
+            %% Receiver
+            
+            % Initialize received bits in a user matrix: 
+            % each row represents a user string
+            RxBits = zeros(Users, NumOfBits/Users);
+            
             for i = 1:Users
                 % first split up into virtual RAKE antennas. There are
                 % P.NumberRxAntennas*P.ChannelLength virtual antennas per user
@@ -152,6 +185,8 @@ function BER = simulator(P)
                 % MIMO with the virtual RAKE antennas directly gives the
                 % estimation of the sent signal on each antenna
                 H_User = squeeze(H(:,:,i));
+                
+                % MIMO detector
                 switch P.MIMODetectorType
                     case 'ZF'
                         H_H = H_User';
