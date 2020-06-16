@@ -102,7 +102,7 @@ function BER = simulator(P)
         txsymbols = SpreadSequence(:, 1:Users) * symbols.';
         
         % Applying PN sequence
-        % txsymbols(:) reshapes all elements of A into a single column 
+        % txsymbols(:) reshapes all elements into a single column 
         % vector, acting columnwise. Dimension:
         % (SeqLen*NumOfEncBits/Users) x 1 = NumOfChipsPerUser x 1
         % PNSequence   has dimension:       NumOfChipsPerUser x 1
@@ -143,6 +143,8 @@ function BER = simulator(P)
 
         % Noise initialization: 
         % independent gaussian entries with unit variance (unit average power)
+        % Noise is added to each chip after the convolution of the symbols 
+        % with the channel impulse response
         snoise = randn(P.ChannelLength * P.NumberRxAntennas, NumOfRxChipsPerUser, Users) + ...
                  1i * randn(P.ChannelLength * P.NumberRxAntennas, NumOfRxChipsPerUser, Users);
 
@@ -207,13 +209,8 @@ function BER = simulator(P)
             for ii = 1:Users
                 % first split up into virtual RAKE antennas. There are
                 % P.NumberRxAntennas*P.ChannelLength virtual antennas per user
-                UserSequence = SpreadSequence(:,ii) * SeqLen; 
-                    % NOTE: Despreading should bring the signal back to
-                    % unit power (in a bypass situation).
-                    % Here the rx signal power without SeqLen coefficient gets
-                    % decreased by a total factor of 64, that's why I
-                    % would multiply by 64 to get again a total average
-                    % power of 1 for the signal
+                UserSequence = SpreadSequence(:,ii); 
+
                 rakeAntennas = zeros(P.NumberRxAntennas * P.ChannelLength, NumOfEncBits/Users);
                 
                 for jj = 1:P.NumberRxAntennas
@@ -241,6 +238,7 @@ function BER = simulator(P)
                 
                 % MIMO detector
                 switch P.MIMODetectorType
+                    
                     case 'ZF'
                         G = (H_User' * H_User) \ H_User';
                         sTilde = G * rakeAntennas;
@@ -252,6 +250,7 @@ function BER = simulator(P)
                         sTilde = G * rakeAntennas;
                         
                     case 'SIC'
+                        % V-BLAST algorithm: CHECK
                         yi = rakeAntennas;
                         Hi = H_User;
                         % BPSK modulation
