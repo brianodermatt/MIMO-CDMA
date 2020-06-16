@@ -6,7 +6,7 @@
 
 clc; clear all; close all;
 
-% Parameters
+% Fixed Parameters
 P.NumberOfFrames	= 100;      % Total number of sent frames
 P.BitsPerUser       = 172;      % Bits per frame that each user is given, for 9600bps frame according to spec 
 P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
@@ -18,6 +18,15 @@ P.SNRRange          = SNRRange - 10*log10(P.HadLen);
 
 displaySnrRange = P.SNRRange + 10*log10(P.HadLen);
 
+% % Parameters for Bypass or AWGN
+% P.NumberTxAntennas  = 3;        % Number of transmission antennas for MIMO
+% P.NumberRxAntennas  = 3;        % Number of receive antennas for MIMO
+% P.ChannelType       = 'AWGN';
+% P.ChannelLength     = 1;
+% P.RakeFingers       = 1;
+% P.CDMAUsers = 2;
+% 
+% BER = simulator(P)
 
 %% first simulation: vary number of users
 % P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO

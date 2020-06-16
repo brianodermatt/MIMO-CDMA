@@ -127,13 +127,14 @@ function BER = simulator(P)
 
         switch P.ChannelType
             case 'Bypass'
-                error('Channel not supported yet')
-
+                P.ChannelLength = 1;
+                P.RakeFingers   = 1;
+                P.MIMODetectorType = 'Simple';
+                
             case 'AWGN'
-                error('Channel not supported yet')
-
-            case 'Singlepath Fading'
-                error('Channel not supported yet')
+                P.ChannelLength = 1;
+                P.RakeFingers   = 1;
+                P.MIMODetectorType = 'Simple';
             
             case 'Multipath'
                 % MIMO multipath channel matrix 
@@ -168,16 +169,28 @@ function BER = simulator(P)
             switch P.ChannelType
                 
                 case 'Bypass'
-                    error('Channel not supported yet')
+                    y = zeros(P.NumberRxAntennas, NumOfRxChipsPerUser, Users);
+                    for ii = 1:Users
+                        for jj = 1:P.NumberRxAntennas
+                            for kk = 1:P.NumberTxAntennas
+                                y(jj,:,ii) = y(jj,:,ii) + mwaveform(kk,:,ii);
+                            end                            
+                        end
+                    end
 
                 case 'AWGN'
-                    error('Channel not supported yet')
-
-                case 'Singlepath Fading'
-                    error('Channel not supported yet')
+                    y = zeros(P.NumberRxAntennas, NumOfRxChipsPerUser, Users);
+                    for ii = 1:Users
+                        for jj = 1:P.NumberRxAntennas
+                            for kk = 1:P.NumberTxAntennas
+                                y(jj,:,ii) = y(jj,:,ii) + mwaveform(kk,:,ii);
+                            end
+                            % add noise
+                            y(jj,:,ii) = y(jj,:,ii) + noise(jj,:,ii);
+                        end
+                    end
                 
                 case 'Multipath'
-                    % Add here explanation on dimensions
                     y = zeros(P.NumberRxAntennas, NumOfRxChipsPerUser, Users);
                     
                     for ii = 1:Users
@@ -207,7 +220,7 @@ function BER = simulator(P)
             
             % Initialize received bits in a user matrix: 
             % each row represents a user string
-            RxBits = zeros(Users, NumOfBits/Users);
+            RxBits = zeros(NumOfBits/Users, Users);
             
             for ii = 1:Users
                 % first split up into virtual RAKE antennas. There are
@@ -229,33 +242,39 @@ function BER = simulator(P)
                         % Orthogonal despreading:
                         % each despreading operation gives rise to a 
                         % (1 x NumOfEncBits/Users) vector
-                        VirtualAntennas((jj-1)*P.RakeFingers + mm, :) = UserSequence.' * rxvecs;
-                        
+                        VirtualAntennas((jj-1)*P.RakeFingers + mm, :) = UserSequence.' * rxvecs; 
                     end
                 end
             
                 % MIMO with the virtual RAKE antennas directly gives the
                 % estimate of the sent signal on each antenna
                 % squeeze removes dimensions of length 1
-                H_User = squeeze(H(:,:,ii));
+                % H_User = squeeze(H(:,:,ii));
                 
                 % MIMO detector
                 switch P.MIMODetectorType
                     
+                    case 'Simple'
+                        % For AWGN and Bypass channels
+                        sTilde = VirtualAntennas;
+                    
                     case 'ZF'
-                        G = (H_User' * H_User) \ H_User';
+                        H_ii = squeeze(H(:,:,ii));
+                        G = (H_ii' * H_ii) \ H_ii';
                         sTilde = G * VirtualAntennas;
                         
                     case 'MMSE'
-                        A = H_User' * H_User;
+                        H_ii = squeeze(H(:,:,ii));
+                        A = H_ii' * H_ii;
                         B = P.NumberTxAntennas*SNRlin*eye(size(A));
-                        G = (A + B) \ H_User';
+                        G = (A + B) \ H_ii';
                         sTilde = G * VirtualAntennas;
                         
                     case 'SIC'
+                        H_ii = squeeze(H(:,:,ii));
                         % V-BLAST algorithm
                         for kk = 1:P.NumberTxAntennas
-                            G = (H_User' * H_User) \ H_User';
+                            G = (H_ii' * H_ii) \ H_ii';
                             
                             % Row of G with the smallest two norm: correct
                             [~, idx] = min(vecnorm(G,2,2));
@@ -269,10 +288,10 @@ function BER = simulator(P)
                             sTilde(real(sTilde)> 0) = +1;
                             sTilde(real(sTilde)<=0) = -1;
 
-                            VirtualAntennas = VirtualAntennas - H_User(:,idx) * sTilde;
+                            VirtualAntennas = VirtualAntennas - H_ii(:,idx) * sTilde;
                             
                             % delete from H_user
-                            H_User(:,idx) = [];
+                            H_ii(:,idx) = [];
                         end
                         
                     otherwise
@@ -284,15 +303,14 @@ function BER = simulator(P)
                 mrc = mean(sTilde, 1);
                 
                 % Decoding the bits: soft Viterbi decoder
-                decodedBits = step(decoder, real(mrc).');
+                decodedBits  = step(decoder, real(mrc).');
                 
                 % Eliminating convolution tails
-                RxBits(ii,:) = decodedBits(1:P.BitsPerUser);
+                RxBits(:,ii) = decodedBits(1:P.BitsPerUser).';
             end
 
             % Flatten the bit vectors for BER count
-            RxBits  = reshape(RxBits.', NumOfBits, 1);
-
+            RxBits      = reshape(RxBits, NumOfBits, 1);
             % Error count
             errors      = sum(RxBits ~= Bits);
             % Add to the errors found in the previous frames
