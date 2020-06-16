@@ -89,6 +89,9 @@ function BER = simulator(P)
         for ii = 1:Users
             EncBits(:,ii) = step(encoder, Bits(:,ii));
         end
+        
+        % Flatten the bit vectors for BER count
+        Bits = reshape(Bits, NumOfBits, 1);
 
         % BPSK Modulation:
         % 0 ----> +1
@@ -211,7 +214,7 @@ function BER = simulator(P)
                 % P.NumberRxAntennas*P.ChannelLength virtual antennas per user
                 UserSequence = SpreadSequence(:,ii); 
 
-                rakeAntennas = zeros(P.NumberRxAntennas * P.ChannelLength, NumOfEncBits/Users);
+                VirtualAntennas = zeros(P.NumberRxAntennas * P.ChannelLength, NumOfEncBits/Users);
                 
                 for jj = 1:P.NumberRxAntennas
                     for mm = 1:P.RakeFingers
@@ -226,7 +229,7 @@ function BER = simulator(P)
                         % Orthogonal despreading:
                         % each despreading operation gives rise to a 
                         % (1 x NumOfEncBits/Users) vector
-                        rakeAntennas((jj-1)*P.RakeFingers + mm, :) = UserSequence.' * rxvecs;
+                        VirtualAntennas((jj-1)*P.RakeFingers + mm, :) = UserSequence.' * rxvecs;
                         
                     end
                 end
@@ -241,39 +244,40 @@ function BER = simulator(P)
                     
                     case 'ZF'
                         G = (H_User' * H_User) \ H_User';
-                        sTilde = G * rakeAntennas;
+                        sTilde = G * VirtualAntennas;
                         
                     case 'MMSE'
                         A = H_User' * H_User;
                         B = P.NumberTxAntennas*SNRlin*eye(size(A));
                         G = (A + B) \ H_User';
-                        sTilde = G * rakeAntennas;
+                        sTilde = G * VirtualAntennas;
                         
                     case 'SIC'
-                        % V-BLAST algorithm: CHECK
-                        yi = rakeAntennas;
-                        Hi = H_User;
-                        % BPSK modulation
-                        Constellations = [-1 1];   
+                        % V-BLAST algorithm
                         for kk = 1:P.NumberTxAntennas
-                            Gi = (Hi' * Hi) \ Hi';
-                            g1i_star = Gi(1,:);
-                            % here we actually produce sHats and not sTilde
-                            for bb = 1:NumOfEncBits/Users
-                                temp = g1i_star*yi;
-                                [~, closestIndex] = min(temp(bb) - Constellations);
-                                sTilde(kk,bb) = Constellations(closestIndex);
-                            end
-                            yi = yi - Hi(:,1) * sTilde(kk);
-                            Hi(:,1) = [];
+                            G = (H_User' * H_User) \ H_User';
+                            
+                            % Row of G with the smallest two norm: correct
+                            [~, idx] = min(vecnorm(G,2,2));
+                            
+                            g_star = G(idx,:);
+                            
+                            % Noisy sybol in constellation space
+                            sTilde = g_star*VirtualAntennas;
+                            
+                            % BPSK demapping
+                            sTilde(real(sTilde)> 0) = +1;
+                            sTilde(real(sTilde)<=0) = -1;
+
+                            VirtualAntennas = VirtualAntennas - H_User(:,idx) * sTilde;
+                            
+                            % delete from H_user
+                            H_User(:,idx) = [];
                         end
                         
                     otherwise
                         error('MIMO Detector not supported');
                 end
-                
-                % could map to closest constellation point but
-                % this would destroy information
                 
                 % since all antennas sent the same data, we can average the
                 % estimates of each Tx antenna
@@ -287,7 +291,6 @@ function BER = simulator(P)
             end
 
             % Flatten the bit vectors for BER count
-            Bits    = reshape(Bits,     NumOfBits, 1);
             RxBits  = reshape(RxBits.', NumOfBits, 1);
 
             % Error count
