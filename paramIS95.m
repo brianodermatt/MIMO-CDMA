@@ -7,7 +7,7 @@
 clc; clear all; close all;
 
 % Fixed Parameters
-P.NumberOfFrames	= 100;      % Total number of sent frames
+P.NumberOfFrames	= 50;      % Total number of sent frames
 P.BitsPerUser       = 172;      % Bits per frame that each user is given, for 9600bps frame according to spec 
 P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
 P.ConstrLen         = 9;        % Constraint length of convolutional encoder
@@ -31,8 +31,8 @@ EbNoRange           = P.SNRRange + 10*log10(P.HadLen);
 % P.MIMODetectorType  = 'MMSE';
 % P.ChannelLength     = 3;
 % P.RakeFingers       = 3;
-% users = [1 2 8 32 64];
-
+% users = [1 16 32 64];
+% 
 % str = {};
 % figure()
 % for i = 1:length(users)
@@ -77,7 +77,7 @@ EbNoRange           = P.SNRRange + 10*log10(P.HadLen);
 % P.MIMODetectorType  = 'MMSE';
 % P.CDMAUsers         = 2;
 % taps = [1, 3, 6];
-
+% 
 % str = {};
 % figure()
 % for i = 1:length(taps)
@@ -125,8 +125,9 @@ P.ChannelType       = 'Multipath';
 P.ChannelLength     = 3;
 P.RakeFingers       = 3;
 P.CDMAUsers         = 2;
-detectors = ["ZF", "MMSE", "SIC"];
 
+detectors = ["ZF", "MMSE", "SIC"];
+detectors = ["SIC"];
 str = {};
 figure()
 for i = 1:length(detectors)

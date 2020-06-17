@@ -242,7 +242,7 @@ function BER = simulator(P)
                         % Orthogonal despreading:
                         % each despreading operation gives rise to a 
                         % (1 x NumOfEncBits/Users) vector
-                        VirtualAntennas((jj-1)*P.RakeFingers + mm, :) = UserSequence.' * rxvecs; 
+                        VirtualAntennas((jj-1)*P.RakeFingers + mm, :) = UserSequence.' * rxvecs;% 1/SeqLen*
                     end
                 end
             
@@ -271,29 +271,78 @@ function BER = simulator(P)
                         sTilde = G * VirtualAntennas;
                         
                     case 'SIC'
-                        H_ii = squeeze(H(:,:,ii));
-                        % V-BLAST algorithm
+                        H_User = squeeze(H(:,:,ii));
+                        yi = VirtualAntennas;
+                        Hi = H_User;
+                        % BPSK modulation
+                        Constellations = [-1 1];   
                         for kk = 1:P.NumberTxAntennas
-                            G = (H_ii' * H_ii) \ H_ii';
-                            
-                            % Row of G with the smallest two norm: correct
-                            [~, idx] = min(vecnorm(G,2,2));
-                            
-                            g_star = G(idx,:);
-                            
-                            % Noisy sybol in constellation space
-                            sTilde = g_star*VirtualAntennas;
-                            
-                            % BPSK demapping
-                            sTilde(real(sTilde)> 0) = +1;
-                            sTilde(real(sTilde)<=0) = -1;
-
-                            VirtualAntennas = VirtualAntennas - H_ii(:,idx) * sTilde;
-                            
-                            % delete from H_user
-                            H_ii(:,idx) = [];
+                            Gi = (Hi' * Hi) \ Hi';
+                            g1i_star = Gi(1,:);
+                            temp = g1i_star*yi;
+                            % here we actually produce sHats and not sTilde
+                            for bb = 1:NumOfEncBits/Users
+                                [~, closestIndex] = min(abs(temp(bb) - Constellations));
+                                sTilde(kk,bb) = Constellations(closestIndex);
+                            end
+                            yi = yi - Hi(:,1) * sTilde(kk);
+                            Hi(:,1) = [];
                         end
+                
+%                     case 'SIC'
+%                         H_ii = squeeze(H(:,:,ii));
+%                         yi = VirtualAntennas;
+%                         Hi = H_ii;
+%                         Constellations = [-1 1];    % here, the signal is BPSK
+%                         for kk = P.NumberTxAntennas:-1:1
+%                             Hi_H = Hi';
+%                             Hi_inv = (Hi_H * Hi) \ Hi_H;
+%                             g1i_star = Hi_inv(kk,:);
+%                             % here we actually produce sHats and not sTilde
+%                             for bb = 1:NumOfEncBits/Users
+%                                 temp = g1i_star*yi;
+%                                 [~, closestIndex] = min(abs(temp(bb) - Constellations));
+%                                 sTilde(kk,bb) = Constellations(closestIndex);
+%                             end
+%                             yi = yi - Hi(:,kk) * sTilde(kk);
+%                             Hi(:,kk) = [];
+%                         end
+
+
                         
+%                     case 'SIC'
+%                         H_user = squeeze(H(:,:,ii));
+%                         H_ii = H_user;
+%                         
+%                         sTilde = zeros(P.NumberTxAntennas, NumOfEncBits/Users);
+%                         sHat = sTilde;
+%                         
+%                         % V-BLAST algorithm
+%                         for kk = 1:P.NumberTxAntennas
+%                             G = (H_ii' * H_ii) \ H_ii';
+%                             
+% %                             % Row of G with the smallest two norm: correct
+% %                             [~, idx] = min(vecnorm(G,2,2));
+%                             
+%                             g_star = G(1,:);
+%                             
+%                             % Noisy sybol in constellation space
+%                             temp = g_star*VirtualAntennas;
+%                             
+%                             % BPSK demapping
+%                             
+%                             sHat(kk, real(temp)> 0) = +1;
+%                             sHat(kk, real(temp)<=0) = -1;
+%                             
+%                             sTilde(kk, :) = temp;
+% 
+%                             VirtualAntennas = VirtualAntennas - H_ii(:,1) * sHat(kk);
+%                             
+%                             % delete from H_ii
+%                             H_ii(:,1) = [];
+%                         end
+                        
+                    
                     otherwise
                         error('MIMO Detector not supported');
                 end
