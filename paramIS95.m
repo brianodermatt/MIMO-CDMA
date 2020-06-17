@@ -19,7 +19,7 @@ P.SNRRange          = SNRRange - 10*log10(P.HadLen);
 displaySnrRange = P.SNRRange + 10*log10(P.HadLen);
 
 
-%% first simulation: vary number of users
+% %% first simulation: vary number of users
 % P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
 % P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
 % P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
@@ -40,8 +40,8 @@ displaySnrRange = P.SNRRange + 10*log10(P.HadLen);
 % xlim([min(SNRRange) max(SNRRange)]);
 % grid minor;
 % legend('-DynamicLegend');
-
-%% second simulation: vary number of antennas
+% 
+% %% second simulation: vary number of antennas
 % P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
 % P.MIMODetectorType  = 'MMSE';
 % P.CDMAUsers         = 2;
@@ -63,8 +63,8 @@ displaySnrRange = P.SNRRange + 10*log10(P.HadLen);
 % xlim([min(SNRRange) max(SNRRange)]);
 % grid minor;
 % legend('-DynamicLegend');
-
-%% third simulation: vary channel length
+% 
+% %% third simulation: vary channel length
 % P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
 % P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
 % P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
@@ -85,8 +85,8 @@ displaySnrRange = P.SNRRange + 10*log10(P.HadLen);
 % xlim([min(SNRRange) max(SNRRange)]);
 % grid minor;
 % legend('-DynamicLegend');
-
-%% fourth simulation: vary number of RAKE fingers
+% 
+% %% fourth simulation: vary number of RAKE fingers
 % P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
 % P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
 % P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
@@ -117,6 +117,8 @@ P.RakeFingers       = 3;
 P.CDMAUsers         = 2;
 figure();
 detectors = ["ZF", "MMSE", "SIC"];
+%detectors = ["SIC"];
+
 for i = 1:length(detectors)
     detector = detectors(i);
     P.MIMODetectorType = detector;

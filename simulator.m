@@ -259,10 +259,10 @@ function BER = simulator(P)
                         for kk = 1:P.NumberTxAntennas
                             Gi = (Hi' * Hi) \ Hi';
                             g1i_star = Gi(1,:);
+                            temp = g1i_star*yi;
                             % here we actually produce sHats and not sTilde
                             for bb = 1:NumOfEncBits/Users
-                                temp = g1i_star*yi;
-                                [~, closestIndex] = min(temp(bb) - Constellations);
+                                [~, closestIndex] = min(abs(temp(bb) - Constellations));
                                 sTilde(kk,bb) = Constellations(closestIndex);
                             end
                             yi = yi - Hi(:,1) * sTilde(kk);
