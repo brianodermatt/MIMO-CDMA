@@ -12,129 +12,131 @@ P.BitsPerUser       = 172;      % Bits per frame that each user is given, for 96
 P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
 P.ConstrLen         = 9;        % Constraint length of convolutional encoder
 P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
+P.SNRRange          = -43:-8;   % SNR Range to simulate in dB
+EbNoRange           = P.SNRRange + 10*log10(P.HadLen);
 
-SNRRange            = -20:1:0;  % SNR Range to simulate in dB
-P.SNRRange          = SNRRange - 10*log10(P.HadLen);
-
-displaySnrRange = P.SNRRange + 10*log10(P.HadLen);
-
-% % Parameters for Bypass or AWGN
-% P.NumberTxAntennas  = 3;        % Number of transmission antennas for MIMO
-% P.NumberRxAntennas  = 3;        % Number of receive antennas for MIMO
+%% Parameters for Bypass or AWGN Simulation
+% P.NumberTxAntennas  = 3;        % Number of transmitter antennas
+% P.NumberRxAntennas  = 3;        % Number of receiver antennas
 % P.ChannelType       = 'AWGN';
 % P.ChannelLength     = 1;
 % P.RakeFingers       = 1;
 % P.CDMAUsers = 2;
-% 
 % BER = simulator(P)
 
 %% first simulation: vary number of users
-% P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
-% P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
-% P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
+% P.NumberTxAntennas  = 2;        % Number of transmitter antennas
+% P.NumberRxAntennas  = 2;        % Number of receiver antennas
+% P.ChannelType       = 'Multipath';
 % P.MIMODetectorType  = 'MMSE';
 % P.ChannelLength     = 3;
 % P.RakeFingers       = 3;
-% figure();
-% users = [1 2 3 10 64];
+% users = [1 2 8 32 64];
+
+% str = {};
+% figure()
 % for i = 1:length(users)
-%    u = users(i);
-%    P.CDMAUsers = u;
-%    name = sprintf('Ch.Len.:%d; Users:%d; Fingers:%d; n_T:%d; n_R:%d Detector:%s',P.ChannelLength,P.CDMAUsers,P.RakeFingers,P.NumberTxAntennas,P.NumberRxAntennas,P.MIMODetectorType);
-%    semilogy(SNRRange,simulator(P),'DisplayName',name);
+%    P.CDMAUsers = users(i);
+%    str = [str, strcat(num2str(users(i)), 'users')];
+%    semilogy(EbNoRange, simulator(P));
 %    hold on;
 % end
-% xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
+% title('MIMO CDMA: N_{TX} = N_{RX} = 2, Multipath, 3 taps, 3 rake fing., MMSE')
+% xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
 % ylabel('BER','FontSize',12,'FontWeight','bold');
-% xlim([min(SNRRange) max(SNRRange)]);
 % grid minor;
-% legend('-DynamicLegend');
+% legend(str{:}, 'Location','southwest')
 
 %% second simulation: vary number of antennas
-% P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
+% P.ChannelType       = 'Multipath';
 % P.MIMODetectorType  = 'MMSE';
-% P.CDMAUsers         = 2;
 % P.ChannelLength     = 3;
 % P.RakeFingers       = 3;
-% figure();
-% antennas = [1,1; 2,2; 4,4; 2,4];  % [n_T, n_R], n_R must be bigger than n_T
+% P.CDMAUsers         = 2;
+% antennas = [1,1; 2,2; 4,4; 2,4];  % [N_TX, N_RX], N_RX >= N_TX
+% 
+% str = {};
+% figure()
 % for i = 1:size(antennas,1)
-%     nT = antennas(i,1);
-%     nR = antennas(i,2);
-%     P.NumberTxAntennas  = nT;        % Number of transmission antennas for MIMO
-%     P.NumberRxAntennas  = nR;        % Number of receive antennas for MIMO
-%     name = sprintf('Ch.Len.:%d; Users:%d; Fingers:%d; n_T:%d; n_R:%d Detector:%s',P.ChannelLength,P.CDMAUsers,P.RakeFingers,P.NumberTxAntennas,P.NumberRxAntennas,P.MIMODetectorType);
-%     semilogy(SNRRange,simulator(P),'DisplayName',name);
+%     P.NumberTxAntennas = antennas(i,1);    % Number of transmitter antennas
+%     P.NumberRxAntennas = antennas(i,2);    % Number of receiver antennas
+%     str = [str, strcat('N_{TX} = ', num2str(antennas(i,1)), '; N_{RX} = ', num2str(antennas(i,2)))];
+%     semilogy(EbNoRange, simulator(P));
 %     hold on;
 % end
-% xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
+% title('MIMO CDMA: Multipath, 3 taps, 3 rake fing., MMSE, 2 users')
+% xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
 % ylabel('BER','FontSize',12,'FontWeight','bold');
-% xlim([min(SNRRange) max(SNRRange)]);
 % grid minor;
-% legend('-DynamicLegend');
+% legend(str{:}, 'Location','southwest')
 
 %% third simulation: vary channel length
-% P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
-% P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
-% P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
+% P.NumberTxAntennas  = 2;        % Number of transmitter antennas
+% P.NumberRxAntennas  = 2;        % Number of receiver antennas
+% P.ChannelType       = 'Multipath';
 % P.MIMODetectorType  = 'MMSE';
 % P.CDMAUsers         = 2;
-% figure();
-% lengths = [1, 3, 6];
-% for i = 1:length(lengths)
-%     channelLength = lengths(i);
-%     P.ChannelLength = channelLength;
-%     P.RakeFingers = channelLength;
-%     name = sprintf('Ch.Len.:%d; Users:%d; Fingers:%d; n_T:%d; n_R:%d Detector:%s',P.ChannelLength,P.CDMAUsers,P.RakeFingers,P.NumberTxAntennas,P.NumberRxAntennas,P.MIMODetectorType);
-%     semilogy(SNRRange,simulator(P),'DisplayName',name);
+% taps = [1, 3, 6];
+
+% str = {};
+% figure()
+% for i = 1:length(taps)
+%     P.ChannelLength = taps(i);
+%     P.RakeFingers   = taps(i);
+%     str = [str, strcat(num2str(taps(i)), ' channel taps')];
+%     semilogy(EbNoRange, simulator(P));
 %     hold on;
 % end
-% xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
+% 
+% title('MIMO CDMA: N_{TX} = N_{RX} = 2, Multipath, max. rake fing., MMSE, 2 users')
+% xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
 % ylabel('BER','FontSize',12,'FontWeight','bold');
-% xlim([min(SNRRange) max(SNRRange)]);
 % grid minor;
-% legend('-DynamicLegend');
+% legend(str{:}, 'Location','southwest')
 
 %% fourth simulation: vary number of RAKE fingers
-% P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
-% P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
-% P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
+% P.NumberTxAntennas  = 2;        % Number of transmitter antennas
+% P.NumberRxAntennas  = 2;        % Number of receiver antennas
+% P.ChannelType       = 'Multipath';
 % P.MIMODetectorType  = 'MMSE';
 % P.ChannelLength     = 4;
 % P.CDMAUsers         = 2;
-% figure();
 % fingers = [1, 2, 3, 4];
+% 
+% str = {};
+% figure()
 % for i = 1:length(fingers)
-%     finger = fingers(i);
-%     P.RakeFingers = finger;
-%     name = sprintf('Ch.Len.:%d; Users:%d; Fingers:%d; n_T:%d; n_R:%d Detector:%s',P.ChannelLength,P.CDMAUsers,P.RakeFingers,P.NumberTxAntennas,P.NumberRxAntennas,P.MIMODetectorType);
-%     semilogy(SNRRange,simulator(P),'DisplayName',name);
+%     P.RakeFingers = fingers(i);
+%     str = [str, strcat(num2str(fingers(i)), ' rake fingers')];
+%     semilogy(EbNoRange, simulator(P));
 %     hold on;
 % end
-% xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
+% 
+% title('MIMO CDMA: N_{TX} = N_{RX} = 2, Multipath, 4 taps, MMSE, 2 users')
+% xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
 % ylabel('BER','FontSize',12,'FontWeight','bold');
-% xlim([min(SNRRange) max(SNRRange)]);
 % grid minor;
-% legend('-DynamicLegend');
+% legend(str{:}, 'Location','southwest')
 
 %% fifth simulation: different detectors
-P.NumberTxAntennas  = 2;        % Number of transmission antennas for MIMO
-P.NumberRxAntennas  = 2;        % Number of receive antennas for MIMO
-P.ChannelType       = 'Multipath';   % Since MIMO is implemented, only multipath is possible (inverting an all-1 matrix gives a singularity)
+P.NumberTxAntennas  = 2;        % Number of transmitter antennas
+P.NumberRxAntennas  = 2;        % Number of receiver antennas
+P.ChannelType       = 'Multipath';
 P.ChannelLength     = 3;
 P.RakeFingers       = 3;
 P.CDMAUsers         = 2;
-figure();
 detectors = ["ZF", "MMSE", "SIC"];
+
+str = {};
+figure()
 for i = 1:length(detectors)
-    detector = detectors(i);
-    P.MIMODetectorType = detector;
-    name = sprintf('Ch.Len.:%d; Users:%d; Fingers:%d; n_T:%d; n_R:%d Detector:%s',P.ChannelLength,P.CDMAUsers,P.RakeFingers,P.NumberTxAntennas,P.NumberRxAntennas,P.MIMODetectorType);
-    semilogy(SNRRange,simulator(P),'DisplayName',name);
+    P.MIMODetectorType = detectors(i);
+    str = [str, strcat(detectors(i), ' detector')];
+    semilogy(EbNoRange, simulator(P));
     hold on;
 end
-xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
+title('MIMO CDMA: N_{TX} = N_{RX} = 2, Multipath, 3 taps, 3 rake f., 2 users')
+xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
 ylabel('BER','FontSize',12,'FontWeight','bold');
-xlim([min(SNRRange) max(SNRRange)]);
 grid minor;
-legend('-DynamicLegend');
+legend(str{:}, 'Location','southwest')
