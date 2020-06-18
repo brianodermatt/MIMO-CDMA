@@ -119,25 +119,25 @@ EbNoRange           = P.SNRRange + 10*log10(P.HadLen);
 % legend(str{:}, 'Location','southwest')
 
 %% fifth simulation: different detectors
-P.NumberTxAntennas  = 2;        % Number of transmitter antennas
-P.NumberRxAntennas  = 2;        % Number of receiver antennas
-P.ChannelType       = 'Multipath';
-P.ChannelLength     = 3;
-P.RakeFingers       = 3;
-P.CDMAUsers         = 2;
-
-detectors = ["ZF", "MMSE", "SIC"];
-detectors = ["SIC"];
-str = {};
-figure()
-for i = 1:length(detectors)
-    P.MIMODetectorType = detectors(i);
-    str = [str, strcat(detectors(i), ' detector')];
-    semilogy(EbNoRange, simulator(P));
-    hold on;
-end
-title('MIMO CDMA: N_{TX} = N_{RX} = 2, Multipath, 3 taps, 3 rake f., 2 users')
-xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
-ylabel('BER','FontSize',12,'FontWeight','bold');
-grid minor;
-legend(str{:}, 'Location','southwest')
+% P.NumberTxAntennas  = 2;        % Number of transmitter antennas
+% P.NumberRxAntennas  = 2;        % Number of receiver antennas
+% P.ChannelType       = 'Multipath';
+% P.ChannelLength     = 3;
+% P.RakeFingers       = 3;
+% P.CDMAUsers         = 2;
+% 
+% detectors = ["ZF", "MMSE", "SIC"];
+% % detectors = ["SIC"];
+% str = {};
+% figure()
+% for i = 1:length(detectors)
+%     P.MIMODetectorType = detectors(i);
+%     str = [str, strcat(detectors(i), ' detector')];
+%     semilogy(EbNoRange, simulator(P));
+%     hold on;
+% end
+% title('MIMO CDMA: N_{TX} = N_{RX} = 2, Multipath, 3 taps, 3 rake f., 2 users')
+% xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
+% ylabel('BER','FontSize',12,'FontWeight','bold');
+% grid minor;
+% legend(str{:}, 'Location','southwest')

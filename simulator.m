@@ -6,8 +6,8 @@
 
 
 % Indices in the code:
-% To improve readability, any two or more for loops that run over the same
-% variable have the same indices 
+% To improve readability, any loop that run over a specific variable has a 
+% specific index
 % ii ----> Runs over the users
 % jj ----> Runs over the Rx antennas
 % kk ----> Runs over the Tx antennas
@@ -138,7 +138,7 @@ function BER = simulator(P)
             
             case 'Multipath'
                 % MIMO multipath channel matrix 
-                H = sqrt(1/2) * (...
+                H = 1/sqrt(2*P.ChannelLength) * (...
                     randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users) + ...
                     1i * randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users));
             otherwise
@@ -177,6 +177,7 @@ function BER = simulator(P)
                             end                            
                         end
                     end
+                    y = 1/sqrt(P.NumberTxAntennas) * y;
 
                 case 'AWGN'
                     y = zeros(P.NumberRxAntennas, NumOfRxChipsPerUser, Users);
@@ -185,8 +186,8 @@ function BER = simulator(P)
                             for kk = 1:P.NumberTxAntennas
                                 y(jj,:,ii) = y(jj,:,ii) + mwaveform(kk,:,ii);
                             end
-                            % add noise
-                            y(jj,:,ii) = y(jj,:,ii) + noise(jj,:,ii);
+                            % first normalize with Tx antennas and add noise
+                            y(jj,:,ii) = 1/sqrt(P.NumberTxAntennas)*y(jj,:,ii) + noise(jj,:,ii);
                         end
                     end
                 
@@ -206,7 +207,7 @@ function BER = simulator(P)
                             end
                             
                             % add noise
-                            y(jj,:,ii) = y(jj,:,ii) + noise(jj,:,ii);
+                            y(jj,:,ii) = 1/sqrt(P.NumberTxAntennas)*y(jj,:,ii) + noise(jj,:,ii);
                             
                         end
                     end
@@ -242,7 +243,7 @@ function BER = simulator(P)
                         % Orthogonal despreading:
                         % each despreading operation gives rise to a 
                         % (1 x NumOfEncBits/Users) vector
-                        VirtualAntennas((jj-1)*P.RakeFingers + mm, :) = UserSequence.' * rxvecs;% 1/SeqLen*
+                        VirtualAntennas((jj-1)*P.RakeFingers + mm, :) = 1/SeqLen*UserSequence.' * rxvecs;% 
                     end
                 end
             
