@@ -271,7 +271,7 @@ function BER = simulator(P)
                         % noise variance is given by 1/SNR. Since this is
                         % done after despreading but before Viterbi
                         % decoder, we compensate for the code rate.
-                        B = (P.NumberTxAntennas * P.ChannelLength) / (SNRlin * P.ConvRate) * eye(size(A));
+                        B = (P.NumberTxAntennas * P.RakeFingers) / (SNRlin * P.ConvRate) * eye(size(A));
                         G = (A + B) \ H_ii';
                         sTilde = G * VirtualAntennas;
                         
