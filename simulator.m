@@ -31,11 +31,12 @@ function BER = simulator(P)
     ConstraintLength     = P.ConstrLen;
     Users                = P.CDMAUsers;
     
+    % Spread factor: length of the spreading sequence
+    SeqLen               = P.HadLen;    
     % Hadamard matrix: 
-    % normalization is performed on the noise: noise power is multiplied by 64
-    SpreadSequence       = hadamard(P.HadLen);
-    SeqLen               = P.HadLen;
-    
+    % normalization will be performed directly on the noise power
+    SpreadSequence       = hadamard(SeqLen);
+
     % Total number of bits per frame:
     NumOfBits            = P.BitsPerUser * Users;
     
@@ -50,10 +51,10 @@ function BER = simulator(P)
     % Generating PN sequence
     PNSequence           = genPN(NumOfChipsPerUser);
     % PN sequence is not normalized, the noise power will be therefore
-    % increased by the following factor
-    PNPower              = 2;
+    % increased by the following factor:
+    PNPower              = abs(PNSequence(1))^2; 
+    % avoiding hard coding; PNPower should be 2 in this case
 
-    % Convolutional encoder
     ConvolutionalGeneratorPolynoms = [753 561];
     encoder = comm.ConvolutionalEncoder(...
         'TerminationMethod', 'Terminated', 'TrellisStructure', ...
@@ -141,8 +142,8 @@ function BER = simulator(P)
             
             case 'Multipath'
                 % MIMO multipath channel matrix
-                H = 1/sqrt(2) * (randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users) + ...
-                    1/sqrt(2) * 1i * randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users));
+                H = 1/sqrt(2) * randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users) + ...
+                    1/sqrt(2) * 1i * randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users);
             otherwise
                 error('Channel not supported')
         end
@@ -150,7 +151,9 @@ function BER = simulator(P)
         % Noise initialization: 
         % independent gaussian entries with unit variance (unit average power)
         % Noise is added to each chip after the convolution of the symbols 
-        % with the channel impulse response
+        % with the channel impulse response.
+        % The factor (1/sqrt(2)) means that the noise power is split
+        % equally between the real part and the imaginary part.
         snoise = 1/sqrt(2) * randn(P.ChannelLength * P.NumberRxAntennas, NumOfRxChipsPerUser, Users) + ...
                  1/sqrt(2) * 1i * randn(P.ChannelLength * P.NumberRxAntennas, NumOfRxChipsPerUser, Users);
 
@@ -159,23 +162,22 @@ function BER = simulator(P)
             SNRdb  = P.SNRRange(ss);
             SNRlin = 10^(SNRdb/10);
             
-            % To allow fair simulation, noise needs to be multiplied to
-            % compensate for effects of spreading and code rate:
-            % 1/SNR is the noise power, if defined for a signal power of 1
-            % Factor 1/2: noise power is equally split over the real and imaginary parts
-            % ConvRate: Convolutional encoder of rate 1/2. 2 encoded bits
-            %   for every information bit.
-            % Spread factor (SeqLen): noise is equally distributed over the
-            %   chips; since the chips are not normalized, we increase
-            %   noise power.
-            % PNPower: PN sequence is not normalized, therefore also the
-            %   noise power must be increased accordingly
-            % Channel length: The more taps, the more power.
-            % Tx Antennas: The more antennas, the more power.
-            %   Instead of normalizing the channel taps with the channel
-            %   length and the number of transmitting antennas, we do it
-            %   increasing noise power
-            normFactor = sqrt(1/2 * 1/SNRlin * 1/P.ConvRate * SeqLen * PNPower * P.NumberTxAntennas * P.ChannelLength);
+            % 1/SNR is the noise power for a signal with unitary power
+            % Since encoding, spreading sequences and the channel taps are 
+            % not normalized, noise power must be increased accordingly to 
+            % make a simulation that actually represents the system 
+            % performance.
+            % 1. ConvRate: Convolutional encoder of rate 1/2.
+            %    2 encoded bits for every information bit.
+            % 2. Spread factor (SeqLen): noise is equally distributed over 
+            %    the chips; since the chips are not normalized, we increase
+            %    noise power.
+            % 3. PNPower: QPSK PN sequence is not normalized, therefore
+            %    also the noise power must be increased accordingly.
+            % 4. Channel length: The more taps, the more power.
+            % 5. Tx Antennas: The more transmitting antennas, the more power.
+
+            normFactor = sqrt(1/SNRlin * 1/P.ConvRate * SeqLen * PNPower * P.NumberTxAntennas * P.ChannelLength);
             noise = normFactor * snoise;
 
             %% Channel Transmission
@@ -280,7 +282,7 @@ function BER = simulator(P)
                         % noise variance is given by 1/SNR. Since this is
                         % done after despreading but before Viterbi
                         % decoder, we compensate for the code rate.
-                        B = (P.NumberTxAntennas * P.RakeFingers) / (SNRlin * P.ConvRate) * eye(size(A));
+                        B = (1/SNRlin*1/P.ConvRate*SeqLen*PNPower*P.NumberTxAntennas*P.RakeFingers) * eye(size(A));
                         G = (A + B) \ H_ii';
                         sTilde = G * VirtualAntennas;
                         
