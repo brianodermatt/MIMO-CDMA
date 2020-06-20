@@ -7,12 +7,12 @@
 clc; clear; close all;
 
 % Fixed Parameters
-P.NumberOfFrames	= 100;        % Total number of sent frames
+P.NumberOfFrames	= 100;      % Total number of sent frames
 P.BitsPerUser       = 172;      % Bits per frame that each user is given, for 9600bps frame according to spec 
+P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
 P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
 P.ConstrLen         = 9;        % Constraint length of convolutional encoder
-P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
-P.SNRRange          = -5:1:10;   % SNR Range to simulate in dB
+P.SNRRange          = -5:1:10;  % SNR Range to simulate in dB
 EbNoRange           = P.SNRRange;
 
 % %% Parameters for Bypass or AWGN Simulation
