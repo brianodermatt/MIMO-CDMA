@@ -4,7 +4,7 @@
 % Brian Odermatt, Francesco Gallo
 % May 2020
 
-clc; clear all; close all;
+clc; clear; close all;
 
 % Fixed Parameters
 P.NumberOfFrames	= 100;        % Total number of sent frames
@@ -12,17 +12,17 @@ P.BitsPerUser       = 172;      % Bits per frame that each user is given, for 96
 P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
 P.ConstrLen         = 9;        % Constraint length of convolutional encoder
 P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 standard
-P.SNRRange          = -43:-8;   % SNR Range to simulate in dB
-EbNoRange           = P.SNRRange + 10*log10(P.HadLen);
+P.SNRRange          = -5:1:10;   % SNR Range to simulate in dB
+EbNoRange           = P.SNRRange;
 
-%% Parameters for Bypass or AWGN Simulation
-P.NumberTxAntennas  = 3;        % Number of transmitter antennas
-P.NumberRxAntennas  = 3;        % Number of receiver antennas
-P.ChannelType       = 'AWGN';
-P.ChannelLength     = 1;
-P.RakeFingers       = 1;
-P.CDMAUsers = 2;
-BER = simulator(P);
+% %% Parameters for Bypass or AWGN Simulation
+% P.NumberTxAntennas  = 3;        % Number of transmitter antennas
+% P.NumberRxAntennas  = 3;        % Number of receiver antennas
+% P.ChannelType       = 'AWGN';
+% P.ChannelLength     = 1;
+% P.RakeFingers       = 1;
+% P.CDMAUsers = 2;
+% BER = simulator(P);
 
 %% first simulation: vary number of users
 P.NumberTxAntennas  = 2;        % Number of transmitter antennas
@@ -118,11 +118,12 @@ P.ChannelLength     = 3;
 P.RakeFingers       = 3;
 P.CDMAUsers         = 2;
 
-detectors = ["ZF", "MMSE", "SIC"];
+detectors = {'ZF'; 'MMSE'; 'SIC'};
+
 figure();
 for i = 1:length(detectors)
-    P.MIMODetectorType = detectors(i);
-    semilogy(EbNoRange, simulator(P), 'DisplayName', sprintf('%s detector', detectors(i)));
+    P.MIMODetectorType = detectors{i};
+    semilogy(EbNoRange, simulator(P), 'DisplayName', sprintf('%s detector', detectors{i}));
     hold on;
 end
 title('MIMO CDMA: N_{TX} = N_{RX} = 2, Multipath, 3 taps, 3 rake f., 2 users')

@@ -33,7 +33,7 @@ function BER = simulator(P)
     
     % Normalized Hadamard matrix: 
     % normalize so that the total symbol power does not change
-    SpreadSequence       = hadamard(P.HadLen)/sqrt(P.HadLen);
+    SpreadSequence       = hadamard(P.HadLen);
     SeqLen               = P.HadLen;
     
     % Total number of bits per frame:
@@ -137,10 +137,9 @@ function BER = simulator(P)
                 P.MIMODetectorType = 'Simple';
             
             case 'Multipath'
-                % MIMO multipath channel matrix 
-                H = 1/sqrt(2*P.ChannelLength) * (...
-                    randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users) + ...
-                    1i * randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users));
+                % MIMO multipath channel matrix
+                H = 1/sqrt(2) * (randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users) + ...
+                    1/sqrt(2) * 1i * randn(P.ChannelLength * P.NumberRxAntennas, P.NumberTxAntennas, Users));
             otherwise
                 error('Channel not supported')
         end
@@ -149,20 +148,24 @@ function BER = simulator(P)
         % independent gaussian entries with unit variance (unit average power)
         % Noise is added to each chip after the convolution of the symbols 
         % with the channel impulse response
-        snoise = randn(P.ChannelLength * P.NumberRxAntennas, NumOfRxChipsPerUser, Users) + ...
-                 1i * randn(P.ChannelLength * P.NumberRxAntennas, NumOfRxChipsPerUser, Users);
+        snoise = 1/sqrt(2) * randn(P.ChannelLength * P.NumberRxAntennas, NumOfRxChipsPerUser, Users) + ...
+                 1/sqrt(2) * 1i * randn(P.ChannelLength * P.NumberRxAntennas, NumOfRxChipsPerUser, Users);
 
         % SNR Range
         for ss = 1:length(P.SNRRange)
             SNRdb  = P.SNRRange(ss);
             SNRlin = 10^(SNRdb/10);
-            
-            % Normalize noise according to 
-            % 1. SNR: If signal is normalized to 1, 1/SNR is the noise power;
-            % 2. Factor 2: Noise power is equally distributed over the real and imaginary parts;
-            % 3. Spread factor: noise is equally distributed over the chips.
-            norm_factor = 1/sqrt(2*SNRlin*SeqLen);
-            noise  = norm_factor * snoise;
+
+            % Signal power normalised to 1, 1/SNR is the noise power
+            % To allow fair comparison, noise needs to be multiplied to
+            % compensate for effects of spreading and code rate:
+            % ConvRate: Convolutional encoder of rate 1/2
+            % Factor 2: QPSK encoding (noise power is equally distributed over the real and imaginary parts)
+            % Spread factor: noise is equally distributed over the chips
+            % Channel length: The more taps, the more power
+            % Tx Antennas: The more antennas, the more power
+            normFactor = sqrt(2*(1/P.ConvRate)*SeqLen*P.ChannelLength*P.NumberTxAntennas / SNRlin);
+            noise = normFactor * snoise;
 
             %% Channel Transmission
             
@@ -187,7 +190,7 @@ function BER = simulator(P)
                                 y(jj,:,ii) = y(jj,:,ii) + mwaveform(kk,:,ii);
                             end
                             % first normalize with Tx antennas and add noise
-                            y(jj,:,ii) = 1/sqrt(P.NumberTxAntennas)*y(jj,:,ii) + noise(jj,:,ii);
+                            y(jj,:,ii) = y(jj,:,ii) + noise(jj,:,ii);
                         end
                     end
                 
@@ -207,8 +210,7 @@ function BER = simulator(P)
                             end
                             
                             % add noise
-                            y(jj,:,ii) = 1/sqrt(P.NumberTxAntennas)*y(jj,:,ii) + noise(jj,:,ii);
-                            
+                            y(jj,:,ii) = y(jj,:,ii) + noise(jj,:,ii);
                         end
                     end
                     
@@ -243,14 +245,13 @@ function BER = simulator(P)
                         % Orthogonal despreading:
                         % each despreading operation gives rise to a 
                         % (1 x NumOfEncBits/Users) vector
-                        VirtualAntennas((jj-1)*P.RakeFingers + mm, :) = 1/SeqLen*UserSequence.' * rxvecs;% 
+                        VirtualAntennas((jj-1)*P.RakeFingers + mm, :) = UserSequence.' * rxvecs;
                     end
                 end
             
                 % MIMO with the virtual RAKE antennas directly gives the
                 % estimate of the sent signal on each antenna
                 % squeeze removes dimensions of length 1
-                % H_User = squeeze(H(:,:,ii));
                 
                 % MIMO detector
                 switch P.MIMODetectorType
@@ -267,7 +268,10 @@ function BER = simulator(P)
                     case 'MMSE'
                         H_ii = squeeze(H(:,:,ii));
                         A = H_ii' * H_ii;
-                        B = P.NumberTxAntennas*SNRlin*eye(size(A));
+                        % noise variance is given by 1/SNR. Since this is
+                        % done after despreading but before Viterbi
+                        % decoder, we compensate for the code rate.
+                        B = (P.NumberTxAntennas * P.ChannelLength) / (SNRlin * P.ConvRate) * eye(size(A));
                         G = (A + B) \ H_ii';
                         sTilde = G * VirtualAntennas;
                         
@@ -288,61 +292,7 @@ function BER = simulator(P)
                             end
                             yi = yi - Hi(:,1) * sTilde(kk);
                             Hi(:,1) = [];
-                        end
-                
-%                     case 'SIC'
-%                         H_ii = squeeze(H(:,:,ii));
-%                         yi = VirtualAntennas;
-%                         Hi = H_ii;
-%                         Constellations = [-1 1];    % here, the signal is BPSK
-%                         for kk = P.NumberTxAntennas:-1:1
-%                             Hi_H = Hi';
-%                             Hi_inv = (Hi_H * Hi) \ Hi_H;
-%                             g1i_star = Hi_inv(kk,:);
-%                             % here we actually produce sHats and not sTilde
-%                             for bb = 1:NumOfEncBits/Users
-%                                 temp = g1i_star*yi;
-%                                 [~, closestIndex] = min(abs(temp(bb) - Constellations));
-%                                 sTilde(kk,bb) = Constellations(closestIndex);
-%                             end
-%                             yi = yi - Hi(:,kk) * sTilde(kk);
-%                             Hi(:,kk) = [];
-%                         end
-
-
-                        
-%                     case 'SIC'
-%                         H_user = squeeze(H(:,:,ii));
-%                         H_ii = H_user;
-%                         
-%                         sTilde = zeros(P.NumberTxAntennas, NumOfEncBits/Users);
-%                         sHat = sTilde;
-%                         
-%                         % V-BLAST algorithm
-%                         for kk = 1:P.NumberTxAntennas
-%                             G = (H_ii' * H_ii) \ H_ii';
-%                             
-% %                             % Row of G with the smallest two norm: correct
-% %                             [~, idx] = min(vecnorm(G,2,2));
-%                             
-%                             g_star = G(1,:);
-%                             
-%                             % Noisy sybol in constellation space
-%                             temp = g_star*VirtualAntennas;
-%                             
-%                             % BPSK demapping
-%                             
-%                             sHat(kk, real(temp)> 0) = +1;
-%                             sHat(kk, real(temp)<=0) = -1;
-%                             
-%                             sTilde(kk, :) = temp;
-% 
-%                             VirtualAntennas = VirtualAntennas - H_ii(:,1) * sHat(kk);
-%                             
-%                             % delete from H_ii
-%                             H_ii(:,1) = [];
-%                         end
-                        
+                        end 
                     
                     otherwise
                         error('MIMO Detector not supported');
