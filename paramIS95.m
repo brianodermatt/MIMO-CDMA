@@ -13,9 +13,9 @@ P.HadLen            = 64;       % Length of Hadamard Sequence, given in IS95 sta
 P.ConvRate          = 1/2;      % Rate of convolutional code, only 1/2
 P.ConstrLen         = 9;        % Constraint length of convolutional encoder
 P.SNRRange          = -10:1:10;  % SNR Range to simulate in dB
-EbNoRange           = P.SNRRange;
+SNR                 = P.SNRRange;
 
-% %% Parameters for Bypass or AWGN Simulation
+%% Parameters for Bypass or AWGN Simulation
 % P.NumberTxAntennas  = 3;        % Number of transmitter antennas
 % P.NumberRxAntennas  = 3;        % Number of receiver antennas
 % P.ChannelType       = 'AWGN';
@@ -36,11 +36,11 @@ EbNoRange           = P.SNRRange;
 % figure();
 % for i = 1:length(users)
 %    P.CDMAUsers = users(i);
-%    semilogy(EbNoRange, simulator(P), 'DisplayName', sprintf('%d users', users(i)));
+%    semilogy(SNR, simulator(P), 'DisplayName', sprintf('%d users', users(i)));
 %    hold on;
 % end
 % title(sprintf('MIMO CDMA: n_T=%d, n_R=%d, %s, L_C=%d, N_R=%d, %s', P.NumberTxAntennas, P.NumberRxAntennas, P.ChannelType, P.ChannelLength, P.RakeFingers, P.MIMODetectorType));
-% xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
+% xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
 % ylabel('BER','FontSize',12,'FontWeight','bold');
 % grid minor;
 % legend('-DynamicLegend', 'Location','southwest');
@@ -57,15 +57,15 @@ EbNoRange           = P.SNRRange;
 % for i = 1:size(antennas,1)
 %     P.NumberTxAntennas = antennas(i,1);    % Number of transmitter antennas
 %     P.NumberRxAntennas = antennas(i,2);    % Number of receiver antennas
-%     semilogy(EbNoRange, simulator(P), 'DisplayName', sprintf('n_T = %d; n_R = %d', antennas(i,1), antennas(i,2)));
+%     semilogy(SNR, simulator(P), 'DisplayName', sprintf('n_T = %d; n_R = %d', antennas(i,1), antennas(i,2)));
 %     hold on;
 % end
 % title(sprintf('MIMO CDMA: %s, L_C=%d, N_R=%d, %s, %d users', P.ChannelType, P.ChannelLength, P.RakeFingers, P.MIMODetectorType, P.CDMAUsers));
-% xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
+% xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
 % ylabel('BER','FontSize',12,'FontWeight','bold');
 % grid minor;
 % legend('-DynamicLegend', 'Location','southwest');
-
+% 
 % %% third simulation: vary channel length
 % P.NumberTxAntennas  = 2;        % Number of transmitter antennas
 % P.NumberRxAntennas  = 2;        % Number of receiver antennas
@@ -78,16 +78,16 @@ EbNoRange           = P.SNRRange;
 % for i = 1:length(taps)
 %     P.ChannelLength = taps(i);
 %     P.RakeFingers   = taps(i);
-%     semilogy(EbNoRange, simulator(P), 'DisplayName', sprintf('Channel length %d', taps(i)));
+%     semilogy(SNR, simulator(P), 'DisplayName', sprintf('Channel length %d', taps(i)));
 %     hold on;
 % end
 % 
 % title(sprintf('MIMO CDMA: n_T=%d, n_R=%d, %s, max. number of RAKE fingers, %s, %d users', P.NumberTxAntennas, P.NumberRxAntennas, P.ChannelType, P.MIMODetectorType, P.CDMAUsers));
-% xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
+% xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
 % ylabel('BER','FontSize',12,'FontWeight','bold');
 % grid minor;
 % legend('-DynamicLegend', 'Location','southwest');
-
+% 
 % %% fourth simulation: vary number of RAKE fingers
 % P.NumberTxAntennas  = 2;        % Number of transmitter antennas
 % P.NumberRxAntennas  = 2;        % Number of receiver antennas
@@ -100,12 +100,12 @@ EbNoRange           = P.SNRRange;
 % figure();
 % for i = 1:length(fingers)
 %     P.RakeFingers = fingers(i);
-%     semilogy(EbNoRange, simulator(P), 'DisplayName', sprintf('%d RAKE fingers', fingers(i)));
+%     semilogy(SNR, simulator(P), 'DisplayName', sprintf('%d RAKE fingers', fingers(i)));
 %     hold on;
 % end
 % 
 % title(sprintf('MIMO CDMA: n_T=%d, n_R=%d, %s, L_C=%d, %s, %d users', P.NumberTxAntennas, P.NumberRxAntennas, P.ChannelType, P.ChannelLength, P.MIMODetectorType, P.CDMAUsers));
-% xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
+% xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
 % ylabel('BER','FontSize',12,'FontWeight','bold');
 % grid minor;
 % legend('-DynamicLegend', 'Location','southwest');
@@ -123,12 +123,12 @@ detectors = {'ZF'; 'MMSE'; 'SIC'};
 figure();
 for i = 1:length(detectors)
     P.MIMODetectorType = detectors{i};
-    semilogy(EbNoRange, simulator(P), 'DisplayName', sprintf('%s detector', detectors{i}));
+    semilogy(SNR, simulator(P), 'DisplayName', sprintf('%s detector', detectors{i}));
     hold on;
 end
 title('MIMO CDMA: N_{TX} = N_{RX} = 2, Multipath, 3 taps, 3 rake f., 2 users')
 title(sprintf('MIMO CDMA: n_T=%d, n_R=%d, %s, L_C=%d, N_R=%d, %d users', P.NumberTxAntennas, P.NumberRxAntennas, P.ChannelType, P.ChannelLength, P.RakeFingers, P.CDMAUsers));
-xlabel('E_B/N_0 [dB]','FontSize',12,'FontWeight','bold');
+xlabel('SNR [dB]','FontSize',12,'FontWeight','bold');
 ylabel('BER','FontSize',12,'FontWeight','bold');
 grid minor;
 legend('-DynamicLegend', 'Location','southwest');
