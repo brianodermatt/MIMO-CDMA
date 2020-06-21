@@ -16,13 +16,13 @@ P.SNRRange          = -10:1:10;  % SNR Range to simulate in dB
 SNR                 = P.SNRRange;
 
 %% Parameters for Bypass or AWGN Simulation
-P.NumberTxAntennas  = 3;        % Number of transmitter antennas
-P.NumberRxAntennas  = 3;        % Number of receiver antennas
-P.ChannelType       = 'AWGN';
-P.ChannelLength     = 1;
-P.RakeFingers       = 1;
-P.CDMAUsers = 2;
-BER = simulator(P);
+% P.NumberTxAntennas  = 3;        % Number of transmitter antennas
+% P.NumberRxAntennas  = 3;        % Number of receiver antennas
+% P.ChannelType       = 'AWGN';
+% P.ChannelLength     = 1;
+% P.RakeFingers       = 1;
+% P.CDMAUsers = 2;
+% BER = simulator(P);
 
 %% first simulation: vary number of users
 P.NumberTxAntennas  = 2;        % Number of transmitter antennas
